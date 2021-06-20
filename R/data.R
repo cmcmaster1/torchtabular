@@ -1,21 +1,32 @@
-tabular_dataset <- function(x, ...){
+#' Tabular Dataset.
+#'
+#' @param x either a recipe from the {recipes} package or a data.frame
+#' @param response response variable name (only used if x is a data.frame)
+#' @param cat_vars vector of categorical variable names (only used if x is a data.frame)
+#' @param cont_vars vector of continuous variable names (only used if x is a data.frame)
+#'
+#' @return
+#' @export
+#'
+#' @examples
+tabular_dataset <- function(x, response, cat_vars, cont_vars){
   UseMethod("tabular_dataset")
 }
 
 tabular_dataset.data.frame <- torch::dataset(
   "tabular_dataset",
-  initialize = function(df, response, cat_vars = NULL, cont_vars = NULL) {
+  initialize = function(x, response, cat_vars = NULL, cont_vars = NULL) {
     if (is.null(cat_vars)) {
-      cat_vars <- names(which(!sapply(df, is.numeric)))
+      cat_vars <- names(which(!sapply(x, is.numeric)))
     }
 
     if (is.null(cont_vars)) {
-      cont_vars <- names(which(sapply(df, is.numeric)))
+      cont_vars <- names(which(sapply(x, is.numeric)))
     }
 
-    self$cat_vars <- df[, which(names(df) %in% cat_vars)]
-    self$cont_vars <- df[, which(names(df) %in% cont_vars)]
-    self$response <- df[[response]]
+    self$cat_vars <- x[, which(names(x) %in% cat_vars)]
+    self$cont_vars <- x[, which(names(x) %in% cont_vars)]
+    self$response <- x[[response]]
   },
 
   .getitem = function(index) {
@@ -33,8 +44,8 @@ tabular_dataset.data.frame <- torch::dataset(
 
 tabular_dataset.recipe <- torch::dataset(
   "tabular_dataset",
-  initialize = function(recipe, data) {
-    predictors <- recipe$var_info %>%
+  initialize = function(x, data) {
+    predictors <- x$var_info %>%
       dplyr::filter(role == "predictor")
 
     cat_predictors <- predictors %>%
@@ -45,10 +56,10 @@ tabular_dataset.recipe <- torch::dataset(
       dplyr::filter(type == "numeric") %>%
       dplyr::pull(variable)
 
-    self$categories <- sapply(recipe$template[cat_predictors], function(x) length(levels(x)))
+    self$categories <- sapply(x$template[cat_predictors], function(x) length(levels(x)))
     self$num_continuous <- length(cont_predictors)
 
-    processed <- hardhat::mold(recipe, data)
+    processed <- hardhat::mold(x, data)
     self$predictors <- as.matrix(processed$predictors)
     self$outcomes <- as.numeric(as.matrix(processed$outcomes))
 

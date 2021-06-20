@@ -68,7 +68,7 @@ geglu <- torch::nn_module(
   },
   forward = function(x){
     x_chunk <- x$chunk(2, dim=-1)
-    torch::torch_mul(x_chunk[[1]], nnf_gelu(x_chunk[[2]]))
+    torch::torch_mul(x_chunk[[1]], torch::nnf_gelu(x_chunk[[2]]))
   }
 )
 
@@ -78,7 +78,7 @@ ff <- torch::nn_module(
   initialize = function(dim, mult = 4, dropout = 0.1){
     self$main <- torch::nn_sequential(
       torch::nn_linear(dim, dim * mult * 2),
-      torch::geglu(),
+      geglu(),
       torch::nn_dropout(dropout),
       torch::nn_linear(dim * mult, dim)
     )
@@ -101,7 +101,7 @@ transformer <- torch::nn_module(
     attn_dropout,
     ff_dropout,
     intersample = TRUE)
-    {
+  {
 
     self$layers <- torch::nn_module_list()
 
@@ -199,8 +199,8 @@ mlp <- torch::nn_module(
 )
 
 
-tabular_transformer <- torch::nn_module(
-  "tabular_transformer",
+tabtransformer <- torch::nn_module(
+  "tabtransformer",
   initialize = function(
     categories,
     num_continuous,
