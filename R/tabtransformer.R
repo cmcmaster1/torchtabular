@@ -75,7 +75,7 @@ geglu <- torch::nn_module(
 
 ff <- torch::nn_module(
   "ff",
-  initialize = function(dim, mult = 4, dropout = 0.1){
+  initialize = function(dim, dropout = 0.1, mult = 4){
     self$main <- torch::nn_sequential(
       torch::nn_linear(dim, dim * mult * 2),
       geglu(),
@@ -88,8 +88,8 @@ ff <- torch::nn_module(
   }
 )
 
-transformer <- torch::nn_module(
-  "transformer",
+tabular_transformer <- torch::nn_module(
+  "tabular_transformer",
   initialize = function(
     dim,
     cols,
@@ -102,7 +102,7 @@ transformer <- torch::nn_module(
     ff_dropout,
     intersample = TRUE)
   {
-
+    self$intersample <- intersample
     self$layers <- torch::nn_module_list()
 
     if (intersample){
@@ -142,9 +142,7 @@ transformer <- torch::nn_module(
 
   },
   forward = function(x){
-    x <- self$embeds(x)
-
-    if (intersample){
+    if (self$intersample){
       for (i in 1:length(self$layers)){
         y <- self$layers[[i]][[1]](x)
         y <- self$layers[[i]][[2]](y)
@@ -167,11 +165,13 @@ transformer <- torch::nn_module(
       }
 
     } else {
-      y <- self$layers[[i]][[1]](x)
-      y <- self$layers[[i]][[2]](y)
-      x <- self$layers[[i]][[3]](y)$add_(x)
-      x <- self$layers[[i]][[4]](x)
-      x <- self$layers[[i]][[5]](x)
+      for (i in 1:length(self$layers)){
+        y <- self$layers[[i]][[1]](x)
+        y <- self$layers[[i]][[2]](y)
+        x <- self$layers[[i]][[3]](y)$add_(x)
+        x <- self$layers[[i]][[4]](x)
+        x <- self$layers[[i]][[5]](x)
+      }
     }
 
 
@@ -179,8 +179,8 @@ transformer <- torch::nn_module(
   }
 )
 
-mlp <- torch::nn_module(
-  "mlp",
+tabular_mlp <- torch::nn_module(
+  "tabular_mlp",
   initialize = function(dims, type="binary"){
     dim_pairs <- into_pairs(dims)
     layers <- lapply(dim_pairs, function(x) torch::nn_linear(x[1],x[2]))
@@ -237,11 +237,11 @@ tabtransformer <- torch::nn_module(
 
     total_tokens <- num_unique_categories + 2
 
-    categories_offset <- nnf_pad(torch_tensor(categories), pad = c(1,0), value = 2)
+    categories_offset <- nnf_pad(torch_tensor(categories, device = self$device), pad = c(1,0), value = 2)
     categories_offset <- categories_offset$cumsum(dim=1)
-    lco <- length(categories_offset)
-    categories_offset <- categories_offset[-lco]
-    nn_buffer(categories_offset, persistent = TRUE)
+    lco <- length(categories_offset) - 1
+    categories_offset <- categories_offset[1:lco]
+    self$register_buffer("categories_offset", categories_offset)
 
     self$cols <- num_categorical + num_continuous
 
@@ -249,11 +249,11 @@ tabtransformer <- torch::nn_module(
 
     self$embeds_cat <- nn_embedding(total_tokens, self$dim)
     self$embeds_cont <- nn_module_list(
-      lapply(1:self$num_continuous, function(x)continuous_embedding(100, self$dim))
+      lapply(1:self$num_continuous, function(x) continuous_embedding(100, self$dim))
     )
 
     self$norm <- nn_layer_norm(num_continuous)
-    self$transformer <- transformer(
+    self$transformer <- tabular_transformer(
       dim = self$dim,
       cols = self$cols,
       depth = self$depth,
@@ -272,7 +272,7 @@ tabtransformer <- torch::nn_module(
     hidden_dims <- mlp_hidden_mult * l
     all_dims <- c(input_size, hidden_dims, self$dim_out)
 
-    self$mlp <- mlp(all_dims, type=self$task)
+    self$mlp <- tabular_mlp(all_dims, type=self$task)
 
     # Loss
     if (self$task == "binary"){
@@ -285,7 +285,7 @@ tabtransformer <- torch::nn_module(
     x_cont <- x$x_cont
 
 
-    ### Insert test of cat size
+    ## Insert test of cat size
     x_cat <- x_cat + self$categories_offset
     x_cat <- self$embeds_cat(x_cat)
 
@@ -299,9 +299,9 @@ tabtransformer <- torch::nn_module(
       x_cont_enc[,i,] <- self$embeds_cont[[i]](x_cont[,i])
     }
 
-    x <- torch::torch_cat(c(x_categ, x_cont), dim = 1)
+    x <- torch::torch_cat(c(x_cat, x_cont_enc), dim = 2)
     x <- self$transformer(x)
-    x <- x$flatten(1)
+    x <- torch_flatten(x, start_dim = 2)
     x <- self$mlp(x)
     x
   }

@@ -31,7 +31,7 @@ tabular_dataset.data.frame <- torch::dataset(
 
   .getitem = function(index) {
     response <- torch::torch_tensor(self$response[index])
-    x_cat <- torch::torch_tensor(as.numeric(self$cat_vars[index,]))
+    x_cat <- torch::torch_tensor(as.numeric(self$cat_vars[index,]), dtype = torch_long())
     x_cont <- torch::torch_tensor(as.numeric(self$cont_vars[index,]))
 
     list(x = list(x_cat = x_cat, x_cont = x_cont), y = response)
@@ -69,8 +69,8 @@ tabular_dataset.recipe <- torch::dataset(
   },
 
   .getitem = function(index) {
-    response <- torch::torch_tensor(self$response[index], dtype = torch_long())
-    x_cat <- torch::torch_tensor(self$cat_vars[index,])
+    response <- torch::torch_tensor(self$response[index])
+    x_cat <- torch::torch_tensor(self$cat_vars[index,], dtype = torch_long())
     x_cont <- torch::torch_tensor(self$cont_vars[index,])
 
     list(x = list(x_cat = x_cat, x_cont = x_cont), y = response)
