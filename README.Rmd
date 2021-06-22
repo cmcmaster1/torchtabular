@@ -1,0 +1,37 @@
+---
+output: github_document
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "man/figures/README-",
+  out.width = "100%"
+)
+```
+
+<img src="assets/AUSTIN_LOGO_CMYK.png" width="332"/>
+
+# torchtabular
+
+<!-- badges: start -->
+
+<!-- badges: end -->
+
+A package for training SAINT and TabTransformer variant models in R using {torch}.
+
+## Installation
+
+You can install torchtabular from [GitHub](https://github.com/) with:
+
+``` r
+# install.packages("devtools")
+devtools::install_github("cmcmaster1/torchtabular")
+```
+
+## Example
+
+See the vignette.
