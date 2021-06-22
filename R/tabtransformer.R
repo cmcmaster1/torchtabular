@@ -88,6 +88,7 @@ ff <- torch::nn_module(
   }
 )
 
+
 tabular_transformer <- torch::nn_module(
   "tabular_transformer",
   initialize = function(
@@ -198,7 +199,29 @@ tabular_mlp <- torch::nn_module(
     self$mlp(x)
 )
 
+#' Tabtransformer
+#'
+#' @param categories a vector containing the dimensions of each categorical predictor (in the correct order)
+#' @param num_continuous the number of continuous predictors
+#' @param dim_out dimensions of the output (default is 1, matching the default binary task)
+#' @param task 'regression', 'binary' or 'multiclass'
+#' @param intersample boolean value designating whether to use intersample attention
+#' @param dim embedding dimension for categorical and continuous data
+#' @param depth number of transformer layers
+#' @param heads_selfattn number of self-attention heads
+#' @param heads_intersample number of intersample attention heads
+#' @param dim_heads_selfattn dimensions of the self-attention heads
+#' @param dim_heads_intersample dimension of the intersample attention heads
+#' @param attn_dropout dropout percentage for attention layers
+#' @param ff_dropout dropout percentage for feed-forward layers
+#' @param mlp_hidden_mult a numerical vector indicating the hidden dimensions of the final MLP
+#' @param device 'cpu' or 'cuda'
 
+#'
+#' @return a tabtransformer model
+#' @export
+#'
+#' @examples
 tabtransformer <- torch::nn_module(
   "tabtransformer",
   initialize = function(

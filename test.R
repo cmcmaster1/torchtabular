@@ -45,7 +45,7 @@ model <- tabtransformer(categories = mtcars_train$categories,
                              attn_dropout = 0.1,
                              ff_dropout = 0.8,
                              mlp_hidden_mult = c(4, 2),
-                             device = 'cpu')
+                             device = 'cuda')
 
 x <- mtcars_train$.getitem(1:5)$x
 model$forward
@@ -78,7 +78,6 @@ fitted <- tabtransformer %>%
   fit(train_dl,
       epochs = 10,
       valid_data = valid_dl,
-      accelerator = accelerator(device_placement = TRUE, cpu = TRUE),
       verbose = TRUE)
 
 x <- mtcars_train$.getitem(1:5)$x
