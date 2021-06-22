@@ -101,6 +101,7 @@ tabular_transformer <- torch::nn_module(
     dim_heads_intersample,
     attn_dropout,
     ff_dropout,
+    softmax_mod,
     intersample = TRUE)
   {
     self$intersample <- intersample
@@ -111,12 +112,12 @@ tabular_transformer <- torch::nn_module(
         self$layers$append(
           torch::nn_module_list(
             list(
-              attention(dim, heads_selfattn, dim_heads_selfattn),
+              attention(dim, heads_selfattn, dim_heads_selfattn, softmax_mod),
               torch::nn_dropout(p = attn_dropout),
               torch::nn_layer_norm(dim),
               ff(dim, dropout = ff_dropout),
               torch::nn_layer_norm(dim),
-              attention(dim * cols, heads_intersample, dim_heads_intersample),
+              attention(dim * cols, heads_intersample, dim_heads_intersample, softmax_mod),
               torch::nn_dropout(p = attn_dropout),
               torch::nn_layer_norm(dim * cols),
               ff(dim * cols, dropout = ff_dropout),
@@ -130,7 +131,7 @@ tabular_transformer <- torch::nn_module(
         self$layers$append(
           torch::nn_module_list(
             list(
-              attention(dim, heads_selfattn, dim_heads_selfattn),
+              attention(dim, heads_selfattn, dim_heads_selfattn, softmax_mod),
               torch::nn_dropout(attn_dropout),
               torch::nn_layer_norm(dim),
               ff(dim, dropout = ff_dropout),
@@ -189,11 +190,11 @@ tabular_mlp <- torch::nn_module(
     self$mlp <- torch::nn_sequential()
     mapply(function(x, y) self$mlp$add_module(name = x, module = y), names(layers), layers)
 
-    if (type == "binary"){
-      self$mlp$add_module(name = "out", module = nn_sigmoid())
-    } else if (type == "positive regression") {
-      self$mlp$add_module(name = "out", module = nn_relu())
-    }
+    # if (type == "binary"){
+    #   self$mlp$add_module(name = "out", module = nn_sigmoid())
+    # } else if (type == "positive regression") {
+    #   self$mlp$add_module(name = "out", module = nn_relu())
+    # }
   },
   forward = function(x)
     self$mlp(x)
@@ -215,6 +216,7 @@ tabular_mlp <- torch::nn_module(
 #' @param attn_dropout dropout percentage for attention layers
 #' @param ff_dropout dropout percentage for feed-forward layers
 #' @param mlp_hidden_mult a numerical vector indicating the hidden dimensions of the final MLP
+#' @param softmax_mod multiplier for the attention softmax function
 #' @param device 'cpu' or 'cuda'
 
 #'
@@ -239,6 +241,7 @@ tabtransformer <- torch::nn_module(
     attn_dropout = 0.1,
     ff_dropout = 0.8,
     mlp_hidden_mult = c(4, 2),
+    softmax_mod = 1,
     device = 'cuda'
   ) {
     self$dim <- dim
@@ -253,6 +256,7 @@ tabtransformer <- torch::nn_module(
     self$attn_dropout <- attn_dropout
     self$ff_dropout <- ff_dropout
     self$intersample <- intersample
+    self$softmax_mod <- softmax_mod
     self$device <- device
 
     num_categorical <- length(categories)
@@ -286,6 +290,7 @@ tabtransformer <- torch::nn_module(
       dim_heads_intersample = self$dim_heads_intersample,
       attn_dropout = self$attn_dropout,
       ff_dropout = self$ff_dropout,
+      softmax_mod = self$softmax_mod,
       intersample = self$intersample
     )
 

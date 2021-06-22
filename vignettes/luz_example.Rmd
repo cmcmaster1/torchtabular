@@ -1,0 +1,125 @@
+---
+title: "Using Tidymodels and Luz"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Using Tidymodels and Luz}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+# Load Packages
+
+```{r setup, results='hide', message=FALSE, warning=FALSE}
+library(torchtabular)
+library(tidymodels)
+library(tidyverse)
+library(torch)
+library(luz)
+library(madgrad)
+```
+
+# Load data
+The income dataset is included with the {torchtabular} package.
+
+```{r}
+data('income')
+glimpse(income)
+```
+
+## Prepare data
+First we will convert the target variable into an integer (0 and 1), and convert
+characters to factors so that our tabular dataset will identify them correctly.
+
+```{r}
+income <- income %>%
+  mutate(across(where(is.character), as_factor),
+         income = as.numeric(income) - 1)
+
+glimpse(income)
+```
+
+We can now split the data into train and test sets.
+
+```{r}
+split <- initial_split(income)
+train <- training(split)
+valid <- testing(split)
+```
+
+By creating a recipe, we the `tabular_dataset` function will automatically
+recognise categorical vs. continuous predictors.
+
+```{r}
+recipe <- recipe(income, income ~ .) %>%
+  step_scale(all_numeric_predictors()) %>%
+  step_integer(all_nominal_predictors())
+```
+
+We can then pass this recipe to `tabular_dataset` with the relevant split.
+
+```{r}
+train_dset <- tabular_dataset(recipe, train)
+valid_dset <- tabular_dataset(recipe, valid)
+```
+
+Finally, we make a dataloader.
+
+```{r}
+train_dl <- dataloader(train_dset,
+                       batch_size = 1024,
+                       shuffle = TRUE)
+
+valid_dl <- dataloader(valid_dset,
+                       batch_size = 1024,
+                       shuffle = TRUE)
+```
+
+# Training
+We can now train our model using {luz}
+
+```{r}
+fitted <- tabtransformer %>%
+  setup(
+    loss = nn_bce_with_logits_loss(),
+    optimizer = optim_madgrad,
+    metrics = list(
+       luz_metric_binary_auroc(from_logits = TRUE)
+    )
+  ) %>%
+  set_hparams(categories = train_dset$categories,
+              num_continuous = train_dset$num_continuous,
+              dim_out = 1,
+              task = "binary",
+              intersample = TRUE,
+              dim = 32,
+              depth = 1,
+              heads_selfattn = 8,
+              heads_intersample = 8,
+              dim_heads_selfattn = 16,
+              dim_heads_intersample = 64,
+              attn_dropout = 0.1,
+              ff_dropout = 0.8,
+              mlp_hidden_mult = c(4, 2),
+              softmax_mod = 1,
+              device = 'cuda') %>%
+  set_opt_hparams(lr = 1e-4) %>% 
+  fit(train_dl,
+        epochs = 5,
+        valid_data = valid_dl,
+        verbose = TRUE)
+```
+
+
+
+
+
+
+
+

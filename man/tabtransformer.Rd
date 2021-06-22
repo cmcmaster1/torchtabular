@@ -19,6 +19,7 @@ tabtransformer(
   attn_dropout = 0.1,
   ff_dropout = 0.8,
   mlp_hidden_mult = c(4, 2),
+  softmax_mod = 1,
   device = "cuda"
 )
 }
@@ -50,6 +51,8 @@ tabtransformer(
 \item{ff_dropout}{dropout percentage for feed-forward layers}
 
 \item{mlp_hidden_mult}{a numerical vector indicating the hidden dimensions of the final MLP}
+
+\item{softmax_mod}{multiplier for the attention softmax function}
 
 \item{device}{'cpu' or 'cuda'}
 }
