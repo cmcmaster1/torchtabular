@@ -96,7 +96,6 @@ fitted <- tabtransformer %>%
   set_hparams(categories = train_dset$categories,
               num_continuous = train_dset$num_continuous,
               dim_out = 1,
-              task = "binary",
               intersample = TRUE,
               dim = 32,
               depth = 1,
@@ -111,10 +110,28 @@ fitted <- tabtransformer %>%
               device = 'cuda') %>%
   set_opt_hparams(lr = 1e-4) %>% 
   fit(train_dl,
-        epochs = 5,
-        valid_data = valid_dl,
-        verbose = TRUE)
+      epochs = 1,
+      valid_data = valid_dl,
+      verbose = TRUE)
 ```
+```{r}
+x <- valid_dset$.getitem(1:2)$x
+x$x_cat <- x$x_cat$to(device='cuda')
+x$x_cont <- x$x_cont$to(device='cuda')
+fitted$model$predict_attn(x)
+```
+
+```{r}
+luz_save(fitted, "example.pt")
+```
+
+```{r}
+fitted <- luz_load("example.pt")
+```
+
+
+
+
 
 
 

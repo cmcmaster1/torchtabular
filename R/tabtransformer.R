@@ -54,7 +54,7 @@ attention <- torch::nn_module(
     values <- values$reshape(c(batch_size, seq_length, self$inner_dim))
     o <- self$o_proj(values)
 
-    if (return_attention){
+    if (return_attention == TRUE){
       list(o, attention)
     } else{
       o
@@ -176,8 +176,57 @@ tabular_transformer <- torch::nn_module(
       }
     }
 
-
     x
+  },
+
+  get_attention = function(x){
+    if (self$intersample){
+      for (i in 1:length(self$layers)){
+        out <- self$layers[[i]][[1]](x, return_attention = TRUE)
+
+        attention_maps <- out[[2]]
+        y <- out[[1]]
+
+        y <- self$layers[[i]][[2]](y)
+        x <- self$layers[[i]][[3]](y)$add_(x)
+        x <- self$layers[[i]][[4]](x)
+        x <- self$layers[[i]][[5]](x)
+
+        # change the shape for intersample attention
+        b <- x$shape[1]
+        n <- x$shape[2]
+        d <- x$shape[3]
+        x <- x$reshape(c(1, b, n*d))
+        out <- self$layers[[i]][[6]](x, return_attention = TRUE)
+
+        is_attention_maps <- out[[2]]
+        y <- out[[1]]
+
+        y <- self$layers[[i]][[7]](y)
+        x <- self$layers[[i]][[8]](y)$add_(x)
+        x <- self$layers[[i]][[9]](x)
+        x <- self$layers[[i]][[10]](x)
+        # revert shape
+        x <- x$reshape(c(b, n, d))
+
+        list(x, list(attention_maps, is_attention_maps))
+      }
+
+    } else {
+      for (i in 1:length(self$layers)){
+        out <- self$layers[[i]][[1]](x, return_attention = TRUE)
+
+        attention_maps <- out[[2]]
+        y <- out[[1]]
+
+        y <- self$layers[[i]][[2]](y)
+        x <- self$layers[[i]][[3]](y)$add_(x)
+        x <- self$layers[[i]][[4]](x)
+        x <- self$layers[[i]][[5]](x)
+
+        list(x, attention_maps)
+      }
+    }
   }
 )
 
@@ -190,11 +239,6 @@ tabular_mlp <- torch::nn_module(
     self$mlp <- torch::nn_sequential()
     mapply(function(x, y) self$mlp$add_module(name = x, module = y), names(layers), layers)
 
-    # if (type == "binary"){
-    #   self$mlp$add_module(name = "out", module = nn_sigmoid())
-    # } else if (type == "positive regression") {
-    #   self$mlp$add_module(name = "out", module = nn_relu())
-    # }
   },
   forward = function(x)
     self$mlp(x)
@@ -204,8 +248,7 @@ tabular_mlp <- torch::nn_module(
 #'
 #' @param categories a vector containing the dimensions of each categorical predictor (in the correct order)
 #' @param num_continuous the number of continuous predictors
-#' @param dim_out dimensions of the output (default is 1, matching the default binary task)
-#' @param task 'regression', 'binary' or 'multiclass'
+#' @param dim_out dimensions of the output (default is 1)
 #' @param intersample boolean value designating whether to use intersample attention
 #' @param dim embedding dimension for categorical and continuous data
 #' @param depth number of transformer layers
@@ -230,7 +273,6 @@ tabtransformer <- torch::nn_module(
     categories,
     num_continuous,
     dim_out = 1,
-    task = "binary",
     intersample = TRUE,
     dim = 16,
     depth = 4,
@@ -245,7 +287,6 @@ tabtransformer <- torch::nn_module(
     device = 'cuda'
   ) {
     self$dim <- dim
-    self$task <- task
     self$dim_out <- dim_out
     self$num_continuous <- num_continuous
     self$depth <- depth
@@ -300,12 +341,7 @@ tabtransformer <- torch::nn_module(
     hidden_dims <- mlp_hidden_mult * l
     all_dims <- c(input_size, hidden_dims, self$dim_out)
 
-    self$mlp <- tabular_mlp(all_dims, type=self$task)
-
-    # Loss
-    if (self$task == "binary"){
-      self$loss <- torch::nn_bce_with_logits_loss()
-    }
+    self$mlp <- tabular_mlp(all_dims)
 
   },
   forward = function(x){
@@ -332,5 +368,30 @@ tabtransformer <- torch::nn_module(
     x <- torch_flatten(x, start_dim = 2)
     x <- self$mlp(x)
     x
+  },
+  predict_attn = function(x){
+    x_cat <- x$x_cat
+    x_cont <- x$x_cont
+
+
+    ## Insert test of cat size
+    x_cat <- x_cat + self$categories_offset
+    x_cat <- self$embeds_cat(x_cat)
+
+    ## Insert test of cont size
+    x_cont <- self$norm(x_cont)
+    n <- x_cont$shape
+
+    x_cont_enc <- torch::torch_empty(n[[1]], n[[2]], self$dim, device = self$device)
+
+    for (i in 1:self$num_continuous) {
+      x_cont_enc[,i,] <- self$embeds_cont[[i]](x_cont[,i])
+    }
+
+    x <- torch::torch_cat(c(x_cat, x_cont_enc), dim = 2)
+    out <- self$transformer$get_attention(x)
+    # x <- torch_flatten(out[[1]], start_dim = 2)
+    # x <- self$mlp(x)
+    list(x, out[[2]])
   }
 )
