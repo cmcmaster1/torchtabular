@@ -119,6 +119,24 @@ fitted <- setup %>%
       valid_data = valid_dl,
       verbose = TRUE)
 ```
+```{r}
+x <- valid_dset$.getitem(1:2)$x
+x$x_cat <- x$x_cat$to(device='cuda')
+x$x_cont <- x$x_cont$to(device='cuda')
+fitted$model$predict_attn(x)
+```
+
+```{r}
+luz_save(fitted, "example.pt")
+```
+
+```{r}
+fitted <- luz_load("example.pt")
+```
+
+
+
+
 
 
 
