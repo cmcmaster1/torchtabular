@@ -183,18 +183,13 @@ tabular_transformer <- torch::nn_module(
 
 tabular_mlp <- torch::nn_module(
   "tabular_mlp",
-  initialize = function(dims, type="binary"){
+  initialize = function(dims){
     dim_pairs <- into_pairs(dims)
     layers <- lapply(dim_pairs, function(x) torch::nn_linear(x[1],x[2]))
 
     self$mlp <- torch::nn_sequential()
     mapply(function(x, y) self$mlp$add_module(name = x, module = y), names(layers), layers)
 
-    # if (type == "binary"){
-    #   self$mlp$add_module(name = "out", module = nn_sigmoid())
-    # } else if (type == "positive regression") {
-    #   self$mlp$add_module(name = "out", module = nn_relu())
-    # }
   },
   forward = function(x)
     self$mlp(x)
@@ -205,7 +200,6 @@ tabular_mlp <- torch::nn_module(
 #' @param categories a vector containing the dimensions of each categorical predictor (in the correct order)
 #' @param num_continuous the number of continuous predictors
 #' @param dim_out dimensions of the output (default is 1, matching the default binary task)
-#' @param task 'regression', 'binary' or 'multiclass'
 #' @param intersample boolean value designating whether to use intersample attention
 #' @param dim embedding dimension for categorical and continuous data
 #' @param depth number of transformer layers
@@ -230,7 +224,6 @@ tabtransformer <- torch::nn_module(
     categories,
     num_continuous,
     dim_out = 1,
-    task = "binary",
     intersample = TRUE,
     dim = 16,
     depth = 4,
@@ -245,7 +238,6 @@ tabtransformer <- torch::nn_module(
     device = 'cuda'
   ) {
     self$dim <- dim
-    self$task <- task
     self$dim_out <- dim_out
     self$num_continuous <- num_continuous
     self$depth <- depth
@@ -300,12 +292,8 @@ tabtransformer <- torch::nn_module(
     hidden_dims <- mlp_hidden_mult * l
     all_dims <- c(input_size, hidden_dims, self$dim_out)
 
-    self$mlp <- tabular_mlp(all_dims, type=self$task)
+    self$mlp <- tabular_mlp(all_dims)
 
-    # Loss
-    if (self$task == "binary"){
-      self$loss <- torch::nn_bce_with_logits_loss()
-    }
 
   },
   forward = function(x){

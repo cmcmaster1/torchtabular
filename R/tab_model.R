@@ -1,6 +1,6 @@
 #' Tabular Model.
 #'
-#' @param x Either a recipe from the {recipes} package or a
+#' @param x Either a tidymodels recipe or a data.frame
 #' @param model model type to be used - default is a transformer type model.
 #' @param ... hyperparameters passed to the model specification
 #'

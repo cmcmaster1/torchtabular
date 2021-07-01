@@ -8,7 +8,6 @@ tabtransformer(
   categories,
   num_continuous,
   dim_out = 1,
-  task = "binary",
   intersample = TRUE,
   dim = 16,
   depth = 4,
@@ -29,8 +28,6 @@ tabtransformer(
 \item{num_continuous}{the number of continuous predictors}
 
 \item{dim_out}{dimensions of the output (default is 1, matching the default binary task)}
-
-\item{task}{'regression', 'binary' or 'multiclass'}
 
 \item{intersample}{boolean value designating whether to use intersample attention}
 

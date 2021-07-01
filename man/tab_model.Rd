@@ -7,7 +7,7 @@
 tab_model(x, model, ...)
 }
 \arguments{
-\item{x}{Either a recipe from the {recipes} package or a}
+\item{x}{Either a tidymodels recipe or a data.frame}
 
 \item{model}{model type to be used - default is a transformer type model.}
 

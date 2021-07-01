@@ -85,18 +85,18 @@ valid_dl <- dataloader(valid_dset,
 We can now train our model using {luz}
 
 ```{r}
-fitted <- tabtransformer %>%
+device <- ifelse(cuda_is_available(), 'cuda', 'cpu')
+setup <- tabtransformer %>%
   setup(
     loss = nn_bce_with_logits_loss(),
     optimizer = optim_madgrad,
     metrics = list(
-       luz_metric_binary_auroc(from_logits = TRUE)
+      luz_metric_binary_auroc(from_logits = TRUE)
     )
   ) %>%
   set_hparams(categories = train_dset$categories,
               num_continuous = train_dset$num_continuous,
               dim_out = 1,
-              task = "binary",
               intersample = TRUE,
               dim = 32,
               depth = 1,
@@ -108,12 +108,16 @@ fitted <- tabtransformer %>%
               ff_dropout = 0.8,
               mlp_hidden_mult = c(4, 2),
               softmax_mod = 1,
-              device = 'cuda') %>%
-  set_opt_hparams(lr = 1e-4) %>% 
+              device = device) %>%
+  set_opt_hparams(lr = 1e-4)
+```
+
+```{r}
+fitted <- setup %>% 
   fit(train_dl,
-        epochs = 5,
-        valid_data = valid_dl,
-        verbose = TRUE)
+      epochs = 1,
+      valid_data = valid_dl,
+      verbose = TRUE)
 ```
 
 
