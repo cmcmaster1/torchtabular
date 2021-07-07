@@ -25,6 +25,13 @@ library(luz)
 library(madgrad)
 ```
 
+# Check for GPU and assign device
+
+```{r}
+device <- ifelse(cuda_is_available(), 'cuda', 'cpu')
+```
+
+
 # Load data
 The income dataset is included with the {torchtabular} package.
 
@@ -73,11 +80,11 @@ Finally, we make a dataloader.
 
 ```{r}
 train_dl <- dataloader(train_dset,
-                       batch_size = 1024,
+                       batch_size = 256,
                        shuffle = TRUE)
 
 valid_dl <- dataloader(valid_dset,
-                       batch_size = 1024,
+                       batch_size = 256,
                        shuffle = TRUE)
 ```
 
@@ -85,8 +92,7 @@ valid_dl <- dataloader(valid_dset,
 We can now train our model using {luz}
 
 ```{r}
-device <- ifelse(cuda_is_available(), 'cuda', 'cpu')
-setup <- tabtransformer %>%
+model_setup <- tabtransformer %>%
   setup(
     loss = nn_bce_with_logits_loss(),
     optimizer = optim_madgrad,
@@ -107,31 +113,62 @@ setup <- tabtransformer %>%
               attn_dropout = 0.1,
               ff_dropout = 0.8,
               mlp_hidden_mult = c(4, 2),
-              softmax_mod = 1,
+              softmax_mod = 2.5,
               device = device) %>%
   set_opt_hparams(lr = 1e-4)
 ```
 
 ```{r}
-fitted <- setup %>% 
+fitted <- model_setup %>% 
   fit(train_dl,
-      epochs = 1,
+      epochs = 10,
       valid_data = valid_dl,
       verbose = TRUE)
 ```
-```{r}
-x <- valid_dset$.getitem(1:2)$x
-x$x_cat <- x$x_cat$to(device='cuda')
-x$x_cont <- x$x_cont$to(device='cuda')
-fitted$model$predict_attn(x)
-```
-
 ```{r}
 luz_save(fitted, "example.pt")
 ```
 
 ```{r}
-fitted <- luz_load("example.pt")
+model <- luz_load("example.pt")
+```
+
+```{r}
+valid_dl <- dataloader(valid_dset,
+                       batch_size = 1500,
+                       shuffle = TRUE)
+
+iter <- valid_dl$.iter()
+batch <- iter$.next()
+batch$x$x_cat <- batch$x$x_cat$to(device = 'cuda')
+batch$x$x_cont <- batch$x$x_cont$to(device = 'cuda')
+full_output <- model$model$predict_attn(batch$x)
+```
+
+
+```{r}
+vars <- full_output[[2]][[1]]$mean(c(1,2))$cpu() %>% as.matrix()
+rownames(vars) <- names(income)[-15]
+colnames(vars) <- names(income)[-15]
+
+heatmap(vars)
+```
+
+```{r}
+vars <- full_output[[2]][[2]]$mean(c(1,2))$cpu() %>% as.matrix()
+
+library(umap)
+mapped <- umap(vars)
+
+y <- as.array(batch$y)
+```
+
+```{r}
+cbind(mapped$layout, y) %>% 
+  as_tibble() %>% 
+  mutate(y = as_factor(y)) %>% 
+  ggplot(aes(x = V1, y = V2, col = y)) + 
+  geom_point()
 ```
 
 

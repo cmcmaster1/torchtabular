@@ -27,7 +27,7 @@ tabtransformer(
 
 \item{num_continuous}{the number of continuous predictors}
 
-\item{dim_out}{dimensions of the output (default is 1, matching the default binary task)}
+\item{dim_out}{dimensions of the output (default is 1)}
 
 \item{intersample}{boolean value designating whether to use intersample attention}
 

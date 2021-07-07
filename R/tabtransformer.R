@@ -117,7 +117,7 @@ tabular_transformer <- torch::nn_module(
               torch::nn_layer_norm(dim),
               ff(dim, dropout = ff_dropout),
               torch::nn_layer_norm(dim),
-              attention(dim * cols, heads_intersample, dim_heads_intersample, softmax_mod),
+              attention(dim * cols, heads_intersample, dim_heads_intersample, 1.0),
               torch::nn_dropout(p = attn_dropout),
               torch::nn_layer_norm(dim * cols),
               ff(dim * cols, dropout = ff_dropout),
@@ -180,6 +180,7 @@ tabular_transformer <- torch::nn_module(
   },
 
   get_attention = function(x){
+    attn <- c()
     if (self$intersample){
       for (i in 1:length(self$layers)){
         out <- self$layers[[i]][[1]](x, return_attention = TRUE)
@@ -209,7 +210,7 @@ tabular_transformer <- torch::nn_module(
         # revert shape
         x <- x$reshape(c(b, n, d))
 
-        list(x, list(attention_maps, is_attention_maps))
+        attn <- append(attn, list(attention_maps, is_attention_maps))
       }
 
     } else {
@@ -224,9 +225,11 @@ tabular_transformer <- torch::nn_module(
         x <- self$layers[[i]][[4]](x)
         x <- self$layers[[i]][[5]](x)
 
-        list(x, attention_maps)
+        attn <- append(attn, attention_maps)
       }
     }
+
+    list(x, attn)
   }
 )
 
@@ -248,11 +251,8 @@ tabular_mlp <- torch::nn_module(
 #'
 #' @param categories a vector containing the dimensions of each categorical predictor (in the correct order)
 #' @param num_continuous the number of continuous predictors
-<<<<<<< HEAD
 #' @param dim_out dimensions of the output (default is 1, matching the default binary task)
-=======
 #' @param dim_out dimensions of the output (default is 1)
->>>>>>> 25674b36f40426aadfe41e28d1d64df449921b74
 #' @param intersample boolean value designating whether to use intersample attention
 #' @param dim embedding dimension for categorical and continuous data
 #' @param depth number of transformer layers
@@ -346,10 +346,6 @@ tabtransformer <- torch::nn_module(
     all_dims <- c(input_size, hidden_dims, self$dim_out)
 
     self$mlp <- tabular_mlp(all_dims)
-<<<<<<< HEAD
-
-=======
->>>>>>> 25674b36f40426aadfe41e28d1d64df449921b74
 
   },
   forward = function(x){
@@ -398,8 +394,8 @@ tabtransformer <- torch::nn_module(
 
     x <- torch::torch_cat(c(x_cat, x_cont_enc), dim = 2)
     out <- self$transformer$get_attention(x)
-    # x <- torch_flatten(out[[1]], start_dim = 2)
-    # x <- self$mlp(x)
+    x <- torch_flatten(out[[1]], start_dim = 2)
+    x <- self$mlp(x)
     list(x, out[[2]])
   }
 )
