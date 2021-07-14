@@ -146,33 +146,33 @@ tabular_transformer <- torch::nn_module(
   forward = function(x){
     if (self$intersample){
       for (i in 1:length(self$layers)){
-        y <- self$layers[[i]][[1]](x)
-        y <- self$layers[[i]][[2]](y)
-        x <- self$layers[[i]][[3]](y)$add_(x)
-        x <- self$layers[[i]][[4]](x)
-        x <- self$layers[[i]][[5]](x)
+        y <- self$layers[[i]][[1]](x) # attention
+        y <- self$layers[[i]][[2]](y) # dropout
+        x <- self$layers[[i]][[3]](y)$add_(x) # layernorm + skip connection
+        y <- self$layers[[i]][[4]](x) # feed forward
+        x <- self$layers[[i]][[5]](y)$add_(x) # layernorm + skip connection
 
         # change the shape for intersample attention
         b <- x$shape[1]
         n <- x$shape[2]
         d <- x$shape[3]
         x <- x$reshape(c(1, b, n*d))
-        y <- self$layers[[i]][[6]](x)
-        y <- self$layers[[i]][[7]](y)
-        x <- self$layers[[i]][[8]](y)$add_(x)
-        x <- self$layers[[i]][[9]](x)
-        x <- self$layers[[i]][[10]](x)
+        y <- self$layers[[i]][[6]](x) # attention
+        y <- self$layers[[i]][[7]](y) # dropout
+        x <- self$layers[[i]][[8]](y)$add_(x) # layernorm + skip connection
+        y <- self$layers[[i]][[9]](x) # feed forward
+        x <- self$layers[[i]][[10]](y)$add_(x) # layernorm + skip connection
         # revert shape
         x <- x$reshape(c(b, n, d))
       }
 
     } else {
       for (i in 1:length(self$layers)){
-        y <- self$layers[[i]][[1]](x)
-        y <- self$layers[[i]][[2]](y)
-        x <- self$layers[[i]][[3]](y)$add_(x)
-        x <- self$layers[[i]][[4]](x)
-        x <- self$layers[[i]][[5]](x)
+        y <- self$layers[[i]][[1]](x) # attention
+        y <- self$layers[[i]][[2]](y) # dropout
+        x <- self$layers[[i]][[3]](y)$add_(x) # layernorm + skip connection
+        y <- self$layers[[i]][[4]](x) # feed forward
+        x <- self$layers[[i]][[5]](y)$add_(x) # layernorm + skip connection
       }
     }
 
@@ -188,10 +188,10 @@ tabular_transformer <- torch::nn_module(
         attention_maps <- out[[2]]
         y <- out[[1]]
 
-        y <- self$layers[[i]][[2]](y)
-        x <- self$layers[[i]][[3]](y)$add_(x)
-        x <- self$layers[[i]][[4]](x)
-        x <- self$layers[[i]][[5]](x)
+        y <- self$layers[[i]][[2]](y) # dropout
+        x <- self$layers[[i]][[3]](y)$add_(x) # layernorm + skip connection
+        y <- self$layers[[i]][[4]](x) # feed forward
+        x <- self$layers[[i]][[5]](y)$add_(x) # layernorm + skip connection
 
         # change the shape for intersample attention
         b <- x$shape[1]
@@ -203,10 +203,10 @@ tabular_transformer <- torch::nn_module(
         is_attention_maps <- out[[2]]
         y <- out[[1]]
 
-        y <- self$layers[[i]][[7]](y)
-        x <- self$layers[[i]][[8]](y)$add_(x)
-        x <- self$layers[[i]][[9]](x)
-        x <- self$layers[[i]][[10]](x)
+        y <- self$layers[[i]][[2]](y) # dropout
+        x <- self$layers[[i]][[3]](y)$add_(x) # layernorm + skip connection
+        y <- self$layers[[i]][[4]](x) # feed forward
+        x <- self$layers[[i]][[5]](y)$add_(x) # layernorm + skip connection
         # revert shape
         x <- x$reshape(c(b, n, d))
 
@@ -220,10 +220,10 @@ tabular_transformer <- torch::nn_module(
         attention_maps <- out[[2]]
         y <- out[[1]]
 
-        y <- self$layers[[i]][[2]](y)
-        x <- self$layers[[i]][[3]](y)$add_(x)
-        x <- self$layers[[i]][[4]](x)
-        x <- self$layers[[i]][[5]](x)
+        y <- self$layers[[i]][[2]](y) # dropout
+        x <- self$layers[[i]][[3]](y)$add_(x) # layernorm + skip connection
+        y <- self$layers[[i]][[4]](x) # feed forward
+        x <- self$layers[[i]][[5]](y)$add_(x) # layernorm + skip connection
 
         attn <- append(attn, attention_maps)
       }

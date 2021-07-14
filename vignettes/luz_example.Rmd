@@ -105,9 +105,9 @@ model_setup <- tabtransformer %>%
               dim_out = 1,
               intersample = TRUE,
               dim = 32,
-              depth = 1,
-              heads_selfattn = 8,
-              heads_intersample = 8,
+              depth = 2,
+              heads_selfattn = 4,
+              heads_intersample = 4,
               dim_heads_selfattn = 16,
               dim_heads_intersample = 64,
               attn_dropout = 0.1,
@@ -126,12 +126,63 @@ fitted <- model_setup %>%
       verbose = TRUE)
 ```
 ```{r}
-luz_save(fitted, "example.pt")
+attn_dl <- dataloader(valid_dset,
+                       batch_size = 1500,
+                       shuffle = FALSE)
 ```
 
 ```{r}
-model <- luz_load("example.pt")
+fitted$model <- fitted$model$to(device = 'cpu')
+heads <- attention_heads(fitted, valid_dset, 2000)
 ```
+
+```{r}
+heatmap(heads)
+```
+
+```{r}
+is_heads <- intersample_attention_heads(fitted, valid_dset, 2000)
+```
+
+```{r}
+library(umap)
+mapped <- umap(is_heads)
+```
+
+```{r}
+y <- as.array(valid_dset$.getitem(1:2000)$y)
+
+cbind(mapped$layout, y) %>% 
+  as_tibble() %>% 
+  mutate(y = as_factor(y)) %>% 
+  ggplot(aes(x = V1, y = V2, col = y)) + 
+  geom_point(alpha = 0.5)
+```
+
+
+
+
+```{r}
+attention_heads <- function(model, dataloader){
+  device <- model$model$device
+  iter <- dataloader$.iter()
+  batch <- iter$.next()
+  batch$x$x_cat <- batch$x$x_cat$to(device = device)
+  batch$x$x_cont <- batch$x$x_cont$to(device = device)
+  full_output <- model$model$predict_attn(batch$x)
+  
+  attention_matrix <- full_output[[2]][[1]]$mean(c(1,2))$cpu() %>% 
+    as.matrix()
+  
+  names <- colnames(valid_dl$dataset$predictors)
+  
+  rownames(attention_matrix) <- names
+  colnames(attention_matrix) <- names
+  
+  attention_matrix
+}
+```
+
 
 ```{r}
 valid_dl <- dataloader(valid_dset,
@@ -143,6 +194,7 @@ batch <- iter$.next()
 batch$x$x_cat <- batch$x$x_cat$to(device = 'cuda')
 batch$x$x_cont <- batch$x$x_cont$to(device = 'cuda')
 full_output <- model$model$predict_attn(batch$x)
+
 ```
 
 
@@ -151,25 +203,10 @@ vars <- full_output[[2]][[1]]$mean(c(1,2))$cpu() %>% as.matrix()
 rownames(vars) <- names(income)[-15]
 colnames(vars) <- names(income)[-15]
 
-heatmap(vars)
+
 ```
 
-```{r}
-vars <- full_output[[2]][[2]]$mean(c(1,2))$cpu() %>% as.matrix()
 
-library(umap)
-mapped <- umap(vars)
-
-y <- as.array(batch$y)
-```
-
-```{r}
-cbind(mapped$layout, y) %>% 
-  as_tibble() %>% 
-  mutate(y = as_factor(y)) %>% 
-  ggplot(aes(x = V1, y = V2, col = y)) + 
-  geom_point()
-```
 
 
 

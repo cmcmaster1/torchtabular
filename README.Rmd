@@ -21,7 +21,7 @@ knitr::opts_chunk$set(
 
 <!-- badges: end -->
 
-A package for training SAINT and TabTransformer variant models in R using {torch}.
+A package for training transformer models on tabular datasets, using SAINT and TabTransformer variant models in R using {torch}.
 
 ## Installation
 
@@ -34,4 +34,166 @@ devtools::install_github("cmcmaster1/torchtabular")
 
 ## Example
 
-See the vignette.
+```{r setup, results='hide', message=FALSE, warning=FALSE}
+library(torchtabular)
+library(tidymodels)
+library(tidyverse)
+library(torch)
+library(luz)
+```
+
+### Check for GPU and assign device
+
+```{r}
+device <- ifelse(cuda_is_available(), 'cuda', 'cpu')
+```
+
+### Load data
+
+The blastchar dataset is included.
+
+```{r}
+data('blastchar')
+glimpse(blastchar)
+```
+
+### Prepare data
+
+First we will convert the target variable into an integer (0 and 1), and convert characters to factors so that our tabular dataset will identify them correctly.
+
+```{r}
+blastchar <- blastchar %>%
+  select(-customerID) %>% 
+  mutate(across(c(where(is.character), SeniorCitizen), as_factor),
+         Churn = as.numeric(Churn) - 1)
+
+glimpse(blastchar)
+```
+
+We can now split the data into train and test sets.
+
+```{r}
+split <- initial_split(blastchar)
+train <- training(split)
+valid <- testing(split)
+```
+
+By creating a recipe, the `tabular_dataset` function will automatically recognise categorical (must be factors) and continuous predictors.
+
+```{r}
+recipe <- recipe(blastchar, Churn ~ .) %>%
+  step_scale(all_numeric_predictors()) %>%
+  step_integer(all_nominal_predictors()) %>% 
+  step_impute_linear(all_predictors())
+```
+
+We can then pass this recipe to `tabular_dataset` with the relevant split.
+
+```{r}
+train_dset <- tabular_dataset(recipe, train)
+valid_dset <- tabular_dataset(recipe, valid)
+```
+
+Finally, we make a dataloader.
+
+```{r}
+train_dl <- dataloader(train_dset,
+                       batch_size = 512,
+                       shuffle = TRUE)
+
+valid_dl <- dataloader(valid_dset,
+                       batch_size = 512,
+                       shuffle = TRUE)
+```
+
+# Training
+
+We can now train our model using {luz}
+
+```{r}
+n_epochs <- 20
+```
+
+
+```{r}
+lr_schedule <- luz_callback_lr_scheduler(torch::lr_one_cycle, 
+                                         max_lr = 1e-4,
+                                         steps_per_epoch = length(train_dl),
+                                         epochs = n_epochs/5)
+```
+
+```{r}
+plot_loss <- luz_callback(
+  name = "plot_loss",
+  initialize = function() {
+  },
+  on_fit_end = function() {
+    metrics <- ctx$get_metrics_df()
+    ctx$p <- ggplot(metrics, aes(x = epoch, y = value, col = set)) +
+      geom_line() +
+      facet_wrap(vars(metric))
+    
+    print(ctx$p)
+  }
+)
+
+plot_cb <- plot_loss()
+```
+
+
+
+```{r}
+model_setup <- tabtransformer %>%
+  setup(
+    loss = nn_bce_with_logits_loss(),
+    optimizer = torch::optim_adam,
+    metrics = list(
+      luz_metric_binary_auroc(from_logits = TRUE)
+    )
+  ) %>%
+  set_hparams(categories = train_dset$categories,
+              num_continuous = train_dset$num_continuous,
+              dim_out = 1,
+              intersample = FALSE,
+              dim = 32,
+              depth = 6,
+              heads_selfattn = 8,
+              heads_intersample = 8,
+              dim_heads_selfattn = 16,
+              dim_heads_intersample = 64,
+              attn_dropout = 0.1,
+              ff_dropout = 0.8,
+              mlp_hidden_mult = c(8, 4, 2),
+              softmax_mod = 1.0,
+              device = device) %>%
+  set_opt_hparams(lr = 1e-4)
+```
+
+```{r}
+fitted <- model_setup %>% 
+  fit(train_dl,
+      epochs = 5,
+      valid_data = valid_dl,
+      verbose = TRUE,
+      callbacks = list(lr_schedule, plot_cb))
+```
+
+
+```{r}
+metrics <- fitted$ctx$get_metrics_df()
+
+p <- metrics %>% 
+  ggplot(aes(x = epoch, y = value, col = set)) + 
+  geom_line() + 
+  facet_wrap(vars(metric))
+
+p
+```
+
+```{r}
+metrics %>% 
+  group_by(set, metric) %>% 
+  summarise(max = max(value))
+```
+
+
