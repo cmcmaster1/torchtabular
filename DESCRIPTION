@@ -8,7 +8,7 @@ Description: This contains a base tabular transformer model.
     Depending on the hyperparameters chosen, the model could be idential
     to the SAINT architecture (https://arxiv.org/abs/2106.01342), the 
     TabTransformer architecture (https://arxiv.org/abs/2012.06678) or a hybrid.
-License: What license is it under?
+License: GPL (>= 3)
 Encoding: UTF-8
 LazyData: true
 URL: https://github.com/cmcmaster1/torchtabular
