@@ -1,7 +1,7 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-<img src="assets/AUSTIN_LOGO_CMYK.png" width="332"/>
+<img src="assets/austin_mos.png" width="400"/>
 
 # torchtabular
 
@@ -186,46 +186,18 @@ fitted <- model_setup %>%
       valid_data = valid_dl,
       verbose = TRUE)
 #> Epoch 1/5
-#> Train metrics: Loss: 0.544 - AUC: 0.6483
-#> Valid metrics: Loss: 0.4747 - AUC: 0.8071
+#> Train metrics: Loss: 0.5633 - AUC: 0.6331
+#> Valid metrics: Loss: 0.4652 - AUC: 0.8099
 #> Epoch 2/5
-#> Train metrics: Loss: 0.4543 - AUC: 0.8074
-#> Valid metrics: Loss: 0.4563 - AUC: 0.8283
+#> Train metrics: Loss: 0.4484 - AUC: 0.8092
+#> Valid metrics: Loss: 0.4932 - AUC: 0.8243
 #> Epoch 3/5
-#> Train metrics: Loss: 0.4401 - AUC: 0.8147
-#> Valid metrics: Loss: 0.5111 - AUC: 0.8283
+#> Train metrics: Loss: 0.444 - AUC: 0.8142
+#> Valid metrics: Loss: 0.4466 - AUC: 0.8314
 #> Epoch 4/5
-#> Train metrics: Loss: 0.4649 - AUC: 0.7951
-#> Valid metrics: Loss: 0.4877 - AUC: 0.83
+#> Train metrics: Loss: 0.436 - AUC: 0.8238
+#> Valid metrics: Loss: 0.4463 - AUC: 0.8329
 #> Epoch 5/5
-#> Train metrics: Loss: 0.4367 - AUC: 0.8177
-#> Valid metrics: Loss: 0.4683 - AUC: 0.8312
-```
-
-``` r
-metrics <- fitted$ctx$get_metrics_df()
-
-p <- metrics %>% 
-  ggplot(aes(x = epoch, y = value, col = set)) + 
-  geom_line() + 
-  facet_wrap(vars(metric))
-
-p
-```
-
-<img src="man/figures/README-unnamed-chunk-12-1.png" width="100%" />
-
-``` r
-metrics %>% 
-  group_by(set, metric) %>% 
-  summarise(max = max(value))
-#> `summarise()` has grouped output by 'set'. You can override using the `.groups` argument.
-#> # A tibble: 4 x 3
-#> # Groups:   set [2]
-#>   set   metric   max
-#>   <chr> <chr>  <dbl>
-#> 1 train auc    0.818
-#> 2 train loss   0.544
-#> 3 valid auc    0.831
-#> 4 valid loss   0.511
+#> Train metrics: Loss: 0.4407 - AUC: 0.8218
+#> Valid metrics: Loss: 0.441 - AUC: 0.832
 ```

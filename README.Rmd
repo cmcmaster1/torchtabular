@@ -151,22 +151,3 @@ fitted <- model_setup %>%
       verbose = TRUE)
 ```
 
-
-```{r}
-metrics <- fitted$ctx$get_metrics_df()
-
-p <- metrics %>% 
-  ggplot(aes(x = epoch, y = value, col = set)) + 
-  geom_line() + 
-  facet_wrap(vars(metric))
-
-p
-```
-
-```{r}
-metrics %>% 
-  group_by(set, metric) %>% 
-  summarise(max = max(value))
-```
-
-
