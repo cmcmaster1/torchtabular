@@ -1,12 +1,22 @@
-attention_heads <- function(model, dataset, n){
+#' Get attention heads
+#'
+#' @param model the tabtransformer model.
+#' @param dataset dataset to pass through the model to generate attention heads.
+#' @param n number of rows to use from the dataset. Default is 100.
+#'
+#' @return average attention heads as a matrix
+#' @export
+#'
+#' @examples
+attention_heads <- function(model, dataset, n = 100){
   device <- model$model$device
   batch <- dataset$.getitem(1:n)
 
   batch$x$x_cat <- batch$x$x_cat$to(device = device)
   batch$x$x_cont <- batch$x$x_cont$to(device = device)
-  full_output <- model$model$predict_attn(batch$x)
+  full_output <- model$model$predict_attn(batch$x, intersample = FALSE)
 
-  attention_matrix <- full_output[[2]][[1]]$mean(c(1,2))$cpu() %>%
+  attention_matrix <- torch::torch_cat(full_output[[2]])$mean(c(1,2))$cpu() %>%
     as.matrix()
 
   names <- colnames(valid_dl$dataset$predictors)
@@ -18,17 +28,32 @@ attention_heads <- function(model, dataset, n){
 }
 
 
-intersample_attention_heads <- function(model, dataset, n){
+#' Get intersample attention heads
+#'
+#' @param model the tabtransformer model.
+#' @param dataset dataset to pass through the model to generate intersample
+#' attention heads.
+#' @param n number of rows to use from the dataset. Default is 100.
+#' @param cut quantile below which attention is rounded down to 0. Default is
+#' 0.99 (i.e. only retain the top 1% of attention heads).
+#'
+#' @return average intersample attention heads as a matrix
+#' @export
+#'
+#' @examples
+intersample_attention_heads <- function(model, dataset, n = 100, cut = 0.99){
   device <- model$model$device
   batch <- dataset$.getitem(1:n)
 
   batch$x$x_cat <- batch$x$x_cat$to(device = device)
   batch$x$x_cont <- batch$x$x_cont$to(device = device)
-  full_output <- model$model$predict_attn(batch$x)
+  full_output <- model$model$predict_attn(batch$x, intersample = TRUE)
 
-  attention_matrix <- full_output[[2]][[2]]$mean(c(1,2))$cpu() %>%
+  attention_matrix <- torch::torch_cat(full_output[[2]])$mean(c(1,2))$cpu() %>%
     as.matrix()
 
+  quant <- quantile(as.vector(attention_matrix), probs = cut)
+  attention_matrix[attention_matrix < quant] <- 0
 
   attention_matrix
 }

@@ -9,6 +9,7 @@ tabtransformer(
   num_continuous,
   dim_out = 1,
   intersample = TRUE,
+  is_first = FALSE,
   dim = 16,
   depth = 4,
   heads_selfattn = 8,

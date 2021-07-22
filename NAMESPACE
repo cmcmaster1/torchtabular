@@ -3,6 +3,8 @@
 S3method(tabular_dataset,data.frame)
 S3method(tabular_dataset,recipe)
 export("%>%")
+export(attention_heads)
+export(intersample_attention_heads)
 export(tab_model)
 export(tabtransformer)
 export(tabular_dataset)
