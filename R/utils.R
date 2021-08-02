@@ -42,7 +42,7 @@ bump_theme <- function() {
 
 torch_sparse <- function(tensor){
   indices <- torch::torch_nonzero(tensor)$t()
-  values <- torch::tensor[indices[1], indices[2]]
+  values <- tensor[indices[1], indices[2]]
   sparse <- torch::torch_sparse_coo_tensor(indices, values, size = tensor$shape)
   sparse
 }
