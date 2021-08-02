@@ -1,7 +1,7 @@
 Package: torchtabular
 Type: Package
 Title: Package for training tabular models using the {torch} package.
-Version: 0.0.1
+Version: 0.1.0
 Author: Christopher McMaster
 Maintainer: The package maintainer <christopher.mcmaster@austin.org.au>
 Description: This contains a base tabular transformer model.
