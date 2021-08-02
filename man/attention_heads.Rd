@@ -4,7 +4,7 @@
 \alias{attention_heads}
 \title{Get attention heads}
 \usage{
-attention_heads(model, dataset, n = 100)
+attention_heads(model, dataset, n = 100, device = "cpu")
 }
 \arguments{
 \item{model}{the tabtransformer model.}
@@ -12,6 +12,8 @@ attention_heads(model, dataset, n = 100)
 \item{dataset}{dataset to pass through the model to generate attention heads.}
 
 \item{n}{number of rows to use from the dataset. Default is 100.}
+
+\item{device}{whether to run this on 'cpu' or 'cuda'}
 }
 \value{
 average attention heads as a matrix

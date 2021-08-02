@@ -4,7 +4,13 @@
 \alias{intersample_attention_heads}
 \title{Get intersample attention heads}
 \usage{
-intersample_attention_heads(model, dataset, n = 100, cut = 0.99)
+intersample_attention_heads(
+  model,
+  dataset,
+  n = 100,
+  cut = 0.99,
+  device = "cpu"
+)
 }
 \arguments{
 \item{model}{the tabtransformer model.}
@@ -16,6 +22,8 @@ attention heads.}
 
 \item{cut}{quantile below which attention is rounded down to 0. Default is
 0.99 (i.e. only retain the top 1% of attention heads).}
+
+\item{device}{whether to run this on 'cpu' or 'cuda'}
 }
 \value{
 average intersample attention heads as a matrix

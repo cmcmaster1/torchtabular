@@ -139,6 +139,7 @@ model_setup <- tabtransformer %>%
               ff_dropout = 0.8,
               mlp_hidden_mult = c(8, 4, 2),
               softmax_mod = 1.0,
+              is_softmax_mod = 1.0,
               device = device) %>%
   set_opt_hparams(lr = 1e-4)
 ```

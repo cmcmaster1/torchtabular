@@ -1,8 +1,6 @@
 continuous_embedding <- torch::nn_module(
   "continuous_embedding",
-  initialize = function(
-    intermediate_dims,
-    embedding_dim) {
+  initialize = function(intermediate_dims, embedding_dim) {
     self$layers <- torch::nn_sequential(
       torch::nn_linear(1, intermediate_dims),
       torch::nn_relu(),
@@ -102,6 +100,7 @@ tabular_transformer <- torch::nn_module(
     attn_dropout,
     ff_dropout,
     softmax_mod,
+    is_softmax_mod,
     intersample = TRUE,
     is_first = FALSE)
   {
@@ -119,7 +118,7 @@ tabular_transformer <- torch::nn_module(
               torch::nn_layer_norm(dim),
               ff(dim, dropout = ff_dropout),
               torch::nn_layer_norm(dim),
-              attention(dim * cols, heads_intersample, dim_heads_intersample, softmax_mod),
+              attention(dim * cols, heads_intersample, dim_heads_intersample, is_softmax_mod),
               torch::nn_dropout(p = attn_dropout),
               torch::nn_layer_norm(dim * cols),
               ff(dim * cols, dropout = ff_dropout),
@@ -329,6 +328,7 @@ tabular_mlp <- torch::nn_module(
 #' @param dim_out dimensions of the output (default is 1, matching the default binary task)
 #' @param dim_out dimensions of the output (default is 1)
 #' @param intersample boolean value designating whether to use intersample attention
+#' @param is_first boolean value designating whether intersample attention comes before MHSA
 #' @param dim embedding dimension for categorical and continuous data
 #' @param depth number of transformer layers
 #' @param heads_selfattn number of self-attention heads
@@ -338,7 +338,8 @@ tabular_mlp <- torch::nn_module(
 #' @param attn_dropout dropout percentage for attention layers
 #' @param ff_dropout dropout percentage for feed-forward layers
 #' @param mlp_hidden_mult a numerical vector indicating the hidden dimensions of the final MLP
-#' @param softmax_mod multiplier for the attention softmax function
+#' @param softmax_mod multiplier for the MHSA softmax function
+#' @param is_softmax_mod multiplier for the intersample attention softmax function
 #' @param device 'cpu' or 'cuda'
 
 #'
@@ -364,6 +365,7 @@ tabtransformer <- torch::nn_module(
     ff_dropout = 0.8,
     mlp_hidden_mult = c(4, 2),
     softmax_mod = 1,
+    is_softmax_mod = 1,
     device = 'cuda'
   ) {
     self$dim <- dim
@@ -379,20 +381,24 @@ tabtransformer <- torch::nn_module(
     self$intersample <- intersample
     self$is_first <- is_first
     self$softmax_mod <- softmax_mod
+    self$is_softmax_mod <- is_softmax_mod
     self$device <- device
 
-    num_categorical <- length(categories)
+
+    self$num_categorical <- length(categories)
     num_unique_categories <- sum(categories)
 
     total_tokens <- num_unique_categories + 2
 
+    if (is.null(categories)) categories <- 0
+
     categories_offset <- nnf_pad(torch_tensor(categories, device = self$device), pad = c(1,0), value = 2)
     categories_offset <- categories_offset$cumsum(dim=1)
     lco <- length(categories_offset) - 1
-    categories_offset <- categories_offset[1:lco]
+    categories_offset <- categories_offset[1:lco]$to(dtype = torch::torch_long())
     self$register_buffer("categories_offset", categories_offset)
 
-    self$cols <- num_categorical + num_continuous
+    self$cols <- self$num_categorical + num_continuous
 
     # Layers
 
@@ -413,6 +419,7 @@ tabtransformer <- torch::nn_module(
       attn_dropout = self$attn_dropout,
       ff_dropout = self$ff_dropout,
       softmax_mod = self$softmax_mod,
+      is_softmax_mod = self$is_softmax_mod,
       intersample = self$intersample,
       is_first = self$is_first
     )
@@ -435,14 +442,17 @@ tabtransformer <- torch::nn_module(
     x_cat <- x_cat + self$categories_offset
     x_cat <- self$embeds_cat(x_cat)
 
+
     ## Insert test of cont size
     # x_cont <- self$norm(x_cont)
     n <- x_cont$shape
 
     x_cont_enc <- torch::torch_empty(n[[1]], n[[2]], self$dim, device = self$device)
 
-    for (i in 1:self$num_continuous) {
-      x_cont_enc[,i,] <- self$embeds_cont[[i]](x_cont[,i])
+    if (self$num_continuous > 0){
+      for (i in 1:self$num_continuous) {
+        x_cont_enc[,i,] <- self$embeds_cont[[i]](x_cont[,i])
+      }
     }
 
     x <- torch::torch_cat(c(x_cat, x_cont_enc), dim = 2)
@@ -466,8 +476,10 @@ tabtransformer <- torch::nn_module(
 
     x_cont_enc <- torch::torch_empty(n[[1]], n[[2]], self$dim, device = self$device)
 
-    for (i in 1:self$num_continuous) {
-      x_cont_enc[,i,] <- self$embeds_cont[[i]](x_cont[,i])
+    if (self$num_continuous > 0){
+      for (i in 1:self$num_continuous) {
+        x_cont_enc[,i,] <- self$embeds_cont[[i]](x_cont[,i])
+      }
     }
 
     x <- torch::torch_cat(c(x_cat, x_cont_enc), dim = 2)

@@ -20,6 +20,7 @@ tabtransformer(
   ff_dropout = 0.8,
   mlp_hidden_mult = c(4, 2),
   softmax_mod = 1,
+  is_softmax_mod = 1,
   device = "cuda"
 )
 }
@@ -31,6 +32,8 @@ tabtransformer(
 \item{dim_out}{dimensions of the output (default is 1)}
 
 \item{intersample}{boolean value designating whether to use intersample attention}
+
+\item{is_first}{boolean value designating whether intersample attention comes before MHSA}
 
 \item{dim}{embedding dimension for categorical and continuous data}
 
@@ -50,7 +53,9 @@ tabtransformer(
 
 \item{mlp_hidden_mult}{a numerical vector indicating the hidden dimensions of the final MLP}
 
-\item{softmax_mod}{multiplier for the attention softmax function}
+\item{softmax_mod}{multiplier for the MHSA softmax function}
+
+\item{is_softmax_mod}{multiplier for the intersample attention softmax function}
 
 \item{device}{'cpu' or 'cuda'}
 }
