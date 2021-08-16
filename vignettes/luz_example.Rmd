@@ -1,0 +1,247 @@
+---
+title: "Using Tidymodels and Luz"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Using Tidymodels and Luz}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 5,
+  fig.height = 5
+)
+```
+
+# Setup
+
+We're going to use the madgrad optimizer @Defazio
+
+```{r setup, results='hide', message=FALSE, warning=FALSE}
+library(torchtabular)
+library(tidymodels)
+library(tidyverse)
+library(torch)
+library(luz)
+library(madgrad)
+```
+
+## Check for GPU and assign device
+
+```{r}
+device <- ifelse(cuda_is_available(), 'cuda', 'cpu')
+```
+
+## Load data
+
+The income dataset is included with the torchtabular package.
+
+```{r}
+data('income')
+glimpse(income)
+```
+
+## Prepare data
+
+First we will convert the target variable into an integer (0 and 1), and convert characters to factors so that our tabular dataset will identify them correctly.
+
+```{r}
+income <- income %>%
+  mutate(across(where(is.character), as_factor),
+         income = as.numeric(income) - 1)
+
+glimpse(income)
+```
+
+We can now split the data into train and test sets.
+
+```{r}
+split <- initial_split(income)
+train <- training(split)
+valid <- testing(split)
+```
+
+By creating a recipe, the `tabular_dataset` function will automatically recognise categorical vs. continuous predictors.
+
+```{r}
+recipe <- recipe(income, income ~ .) %>%
+  step_scale(all_numeric_predictors()) %>%
+  step_integer(all_nominal_predictors())
+```
+
+We can then pass this recipe to `tabular_dataset` with the relevant split.
+
+```{r}
+train_dset <- tabular_dataset(recipe, train)
+valid_dset <- tabular_dataset(recipe, valid)
+```
+
+Finally, we make a dataloader.
+
+```{r}
+train_dl <- dataloader(train_dset,
+                       batch_size = 512,
+                       shuffle = TRUE)
+
+valid_dl <- dataloader(valid_dset,
+                       batch_size = 512,
+                       shuffle = FALSE)
+```
+
+# Training
+
+We can now train our model using luz for 10 epochs.
+
+```{r}
+n_epochs <- 15
+```
+
+We will use a callback to save the best checkpoint.
+
+```{r}
+checkpoint <- luz_callback_model_checkpoint(
+  "checkpoints/",
+  monitor = "valid_loss",
+  save_best_only = TRUE,
+  mode = "min",
+  min_delta = 0
+)
+```
+
+Let's setup the model with our hyperparameters.
+
+```{r}
+model_setup <- tabtransformer %>%
+  setup(
+    loss = nn_bce_with_logits_loss(),
+    optimizer = optim_adamw,
+    metrics = list(
+      luz_metric_binary_auroc(from_logits = TRUE)
+    )
+  ) %>%
+  set_hparams(categories = train_dset$categories,
+              num_continuous = train_dset$num_continuous,
+              dim_out = 1,
+              attention = "both",
+              is_first = TRUE,
+              dim = 32,
+              depth = 1,
+              heads_selfattn = 8,
+              heads_intersample = 8,
+              dim_heads_selfattn = 16,
+              dim_heads_intersample = 64,
+              attn_dropout = 0.1,
+              ff_dropout = 0.8,
+              embedding_dropout = 0.1,
+              mlp_dropout = 0.1,
+              mlp_hidden_mult = c(4, 2),
+              softmax_mod = 10.0,
+              is_softmax_mod = 10.0,
+              device = device)
+```
+
+Finally, we can fit the model. We have set verbose to FALSE so it doesn't fill our console. We can plot the loss and metrics after training to inspect how we did.
+
+```{r}
+fitted <- model_setup %>% 
+  set_opt_hparams(lr = 1e-5) %>% 
+  fit(train_dl,
+      epochs = n_epochs,
+      valid_data = valid_dl,
+      verbose = TRUE,
+      callbacks = list(checkpoint))
+```
+
+Plotting the metrics.
+
+```{r}
+metrics <- fitted$ctx$get_metrics_df()
+
+metrics %>% 
+  ggplot(aes(x = epoch, y = value, col = set)) + 
+  geom_line() + 
+  facet_wrap(vars(metric), scales = "free_y") +
+  theme_bw()
+```
+
+# Investigate the Model
+
+We can now interrogate our model a little further by looking at the attention heads.
+
+## Attention heads
+
+The `attention_heads` function can be used to pull the attention heads from the first 2000 rows in the validation dataset. These attention heads are averaged to get the average attention weights between two variables. We want to run this with a large batch, so will run this on the cpu to take advantage of the larger RAM.
+
+```{r}
+heads <- attention_heads(fitted, valid_dset, n = 2000)
+```
+
+This data is represented nicely using a heatmap.
+
+```{r}
+heatmap(heads)
+```
+
+## Intersample attention heads
+
+The intersample attention heads can be pulled using the `intersample_attention_heads` function.
+
+```{r}
+is_heads <- intersample_attention_heads(fitted, valid_dset, n = 2000, cut = 0.98)
+```
+
+These attention heads lend themselves to clustering. We will start by reducing the number of dimensions using UMAP.
+
+```{r}
+library(uwot)
+library(dbscan)
+library(fpc)
+
+set.seed(132)
+mapped <- umap(is_heads, pca = NULL, n_threads = 4, n_epochs = 500, spread = 3, min_dist = 0.0, n_neighbors = 10)
+umap_comp <- as_tibble(mapped, .name_repair = ~ paste0("C", 1:2))
+
+plotting_data <- umap_comp %>% 
+  bind_cols(valid[1:2000,]) %>% 
+  mutate(income = as_factor(income))
+
+plotting_data %>% 
+  ggplot(aes(x = C1, y = C2, col = income)) +
+  geom_point()
+```
+
+```{r}
+kNNdistplot(umap_comp, k =  20)
+abline(h = 3.0, lty = 2)
+```
+
+```{r}
+scanned <- dbscan(umap_comp, eps = 3.0, MinPts = 20)
+plotting_data %>% 
+  ggplot(aes(x = C1, y = C2, col = as_factor(scanned$cluster))) +
+  geom_point()
+```
+
+We can now look to see if any of our predictors differ between these clusters
+
+```{r}
+library(patchwork)
+p1 <- plotting_data %>% 
+  ggplot(aes(x = C1, y = C2, col = relationship)) +
+  geom_point()
+
+p2 <- plotting_data %>% 
+  ggplot(aes(x = C1, y = C2, col = `education-num`)) +
+  geom_point() +
+  scale_color_viridis_b()
+
+p3 <- plotting_data %>% 
+  ggplot(aes(x = C1, y = C2, col = `hours-per-week`)) +
+  geom_point() +
+  scale_color_viridis_c()
+
+p1 + p2 + p3 + plot_layout(ncol = 1)
+```
