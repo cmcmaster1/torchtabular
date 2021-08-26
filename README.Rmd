@@ -113,7 +113,7 @@ valid_dl <- dataloader(valid_dset,
 We can now train our model using {luz}
 
 ```{r}
-n_epochs <- 5
+n_epochs <- 25
 ```
 
 ```{r}
@@ -122,13 +122,15 @@ model_setup <- tabtransformer %>%
     loss = nn_bce_with_logits_loss(),
     optimizer = madgrad::optim_madgrad,
     metrics = list(
-      luz_metric_binary_auroc(from_logits = TRUE)
+      luz_metric_binary_auroc(from_logits = TRUE),
+      luz_metric_binary_accuracy_with_logits()
     )
   ) %>%
   set_hparams(categories = train_dset$categories,
               num_continuous = train_dset$num_continuous,
               dim_out = 1,
               attention = "both",
+              attention_type = "signed",
               is_first = TRUE,
               dim = 32,
               depth = 1,
@@ -138,15 +140,21 @@ model_setup <- tabtransformer %>%
               dim_heads_intersample = 64,
               attn_dropout = 0.1,
               ff_dropout = 0.8,
-              mlp_hidden_mult = c(8, 4, 2),
+              embedding_dropout = 0.0,
+              mlp_dropout = 0.0,
+              mlp_hidden_mult = c(4, 2),
               softmax_mod = 1.0,
               is_softmax_mod = 1.0,
-              device = device) %>%
-  set_opt_hparams(lr = 1e-4)
+              device = device)
+```
+
+```{r}
+find_lr <- lr_finder(model_setup, train_dl, start_lr = 1e-7, end_lr = 5e-3)
 ```
 
 ```{r}
 fitted <- model_setup %>% 
+  set_opt_hparams(lr = 1e-5) %>% 
   fit(train_dl,
       epochs = n_epochs,
       valid_data = valid_dl,

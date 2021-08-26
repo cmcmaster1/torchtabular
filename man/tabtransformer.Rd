@@ -10,6 +10,7 @@ tabtransformer(
   dim_out = 1,
   final_layer = NULL,
   attention = "both",
+  attention_type = "softmax",
   is_first = FALSE,
   dim = 16,
   depth = 4,
@@ -38,7 +39,13 @@ tabtransformer(
 output to values >= 0 only). Default is NULL, which results a in \code{nn_identity()} layer.}
 
 \item{attention}{(str) string value indicating which type(s) of attention to
-use, either "both", "mhsa" or "inetrsample". Default: "both"}
+use, either "both", "mhsa" or "intersample". Default: "both"}
+
+\item{attention_type}{(str) string value indicating either traditional softmax
+attention ("softmax") or signed attention ("signed"), which preserves the sign
+of the attention heads (negative or positive), so that attention heads can
+be interpreted as either being positively or negatively correlated with the
+outcome.}
 
 \item{is_first}{(bool) designates whether intersample attention comes before MHSA}
 

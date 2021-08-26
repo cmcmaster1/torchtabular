@@ -96,7 +96,7 @@ valid_dl <- dataloader(valid_dset,
 We can now train our model using luz for 10 epochs.
 
 ```{r}
-n_epochs <- 15
+n_epochs <- 10
 ```
 
 We will use a callback to save the best checkpoint.
@@ -117,7 +117,7 @@ Let's setup the model with our hyperparameters.
 model_setup <- tabtransformer %>%
   setup(
     loss = nn_bce_with_logits_loss(),
-    optimizer = optim_adamw,
+    optimizer = optim_madgrad,
     metrics = list(
       luz_metric_binary_auroc(from_logits = TRUE)
     )
@@ -126,6 +126,7 @@ model_setup <- tabtransformer %>%
               num_continuous = train_dset$num_continuous,
               dim_out = 1,
               attention = "both",
+              attention_type = "signed",
               is_first = TRUE,
               dim = 32,
               depth = 1,
@@ -135,24 +136,25 @@ model_setup <- tabtransformer %>%
               dim_heads_intersample = 64,
               attn_dropout = 0.1,
               ff_dropout = 0.8,
-              embedding_dropout = 0.1,
-              mlp_dropout = 0.1,
+              embedding_dropout = 0.0,
+              mlp_dropout = 0.0,
               mlp_hidden_mult = c(4, 2),
-              softmax_mod = 10.0,
-              is_softmax_mod = 10.0,
+              softmax_mod = 1.0,
+              is_softmax_mod = 1.0,
               device = device)
 ```
 
 Finally, we can fit the model. We have set verbose to FALSE so it doesn't fill our console. We can plot the loss and metrics after training to inspect how we did.
 
+
+
 ```{r}
 fitted <- model_setup %>% 
-  set_opt_hparams(lr = 1e-5) %>% 
+  set_opt_hparams(lr = 1e-4) %>% 
   fit(train_dl,
       epochs = n_epochs,
       valid_data = valid_dl,
-      verbose = TRUE,
-      callbacks = list(checkpoint))
+      verbose = TRUE)
 ```
 
 Plotting the metrics.
@@ -190,7 +192,7 @@ heatmap(heads)
 The intersample attention heads can be pulled using the `intersample_attention_heads` function.
 
 ```{r}
-is_heads <- intersample_attention_heads(fitted, valid_dset, n = 2000, cut = 0.98)
+is_heads <- intersample_attention_heads(fitted, valid_dset, n = 2000, cut = 0.00)
 ```
 
 These attention heads lend themselves to clustering. We will start by reducing the number of dimensions using UMAP.
@@ -201,7 +203,16 @@ library(dbscan)
 library(fpc)
 
 set.seed(132)
-mapped <- umap(is_heads, pca = NULL, n_threads = 4, n_epochs = 500, spread = 3, min_dist = 0.0, n_neighbors = 10)
+mapped <- umap(is_heads, 
+               pca = NULL, 
+               n_threads = 4, 
+               n_epochs = 500,
+               min_dist = 0.0,
+               n_neighbors = 30,
+               negative_sample_rate = 15,
+               local_connectivity = 2,
+               spread = 3,
+               metric='correlation')
 umap_comp <- as_tibble(mapped, .name_repair = ~ paste0("C", 1:2))
 
 plotting_data <- umap_comp %>% 
@@ -214,12 +225,12 @@ plotting_data %>%
 ```
 
 ```{r}
-kNNdistplot(umap_comp, k =  20)
-abline(h = 3.0, lty = 2)
+kNNdistplot(umap_comp, k =  10)
+abline(h = 2, lty = 2)
 ```
 
 ```{r}
-scanned <- dbscan(umap_comp, eps = 3.0, MinPts = 20)
+scanned <- dbscan(umap_comp, eps = 2, MinPts = 10)
 plotting_data %>% 
   ggplot(aes(x = C1, y = C2, col = as_factor(scanned$cluster))) +
   geom_point()
@@ -234,9 +245,9 @@ p1 <- plotting_data %>%
   geom_point()
 
 p2 <- plotting_data %>% 
-  ggplot(aes(x = C1, y = C2, col = `education-num`)) +
+  ggplot(aes(x = C1, y = C2, col = `marital-status`)) +
   geom_point() +
-  scale_color_viridis_b()
+  scale_color_viridis_d()
 
 p3 <- plotting_data %>% 
   ggplot(aes(x = C1, y = C2, col = `hours-per-week`)) +

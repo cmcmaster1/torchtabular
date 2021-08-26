@@ -20,7 +20,8 @@ attention heads.}
 
 \item{n}{number of rows to use from the dataset. Default is 100.}
 
-\item{cut}{quantile below which attention is rounded down to 0. Default is
+\item{cut}{quantile below which attention is rounded down to 0.
+This is only used if the model uses softmax attention. Default is
 0.99 (i.e. only retain the top 1% of attention heads).}
 
 \item{device}{whether to run this on 'cpu' or 'cuda'}

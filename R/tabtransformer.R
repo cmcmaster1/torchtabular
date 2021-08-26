@@ -12,7 +12,12 @@
 #' @param final_layer (nn_module) the final layer of the model (e.g. \code{nn_relu()} to constrain
 #' output to values >= 0 only). Default is NULL, which results a in \code{nn_identity()} layer.
 #' @param attention (str) string value indicating which type(s) of attention to
-#' use, either "both", "mhsa" or "inetrsample". Default: "both"
+#' use, either "both", "mhsa" or "intersample". Default: "both"
+#' @param attention_type (str) string value indicating either traditional softmax
+#' attention ("softmax") or signed attention ("signed"), which preserves the sign
+#' of the attention heads (negative or positive), so that attention heads can
+#' be interpreted as either being positively or negatively correlated with the
+#' outcome.
 #' @param is_first (bool) designates whether intersample attention comes before MHSA
 #' @param dim (int) embedding dimension for categorical and continuous data
 #' @param depth (int) number of transformer layers
@@ -52,6 +57,7 @@ tabtransformer <- torch::nn_module(
     dim_out = 1,
     final_layer = NULL,
     attention = "both",
+    attention_type = "softmax",
     is_first = FALSE,
     dim = 16,
     depth = 4,
@@ -85,6 +91,7 @@ tabtransformer <- torch::nn_module(
     self$embedding_dropout <- embedding_dropout
     self$mlp_dropout <- mlp_dropout
     self$attention <- attention
+    self$attention_type <- attention_type
     self$is_first <- is_first
     self$softmax_mod <- softmax_mod
     self$is_softmax_mod <- is_softmax_mod
@@ -130,7 +137,8 @@ tabtransformer <- torch::nn_module(
           attn_dropout = self$attn_dropout,
           ff_dropout = self$ff_dropout,
           softmax_mod = self$softmax_mod,
-          is_softmax_mod = self$is_softmax_mod
+          is_softmax_mod = self$is_softmax_mod,
+          attention_type = self$attention_type
         )
       } else {
         self$transformer <- tabular_transformer_combined_islast(
@@ -144,7 +152,8 @@ tabtransformer <- torch::nn_module(
           attn_dropout = self$attn_dropout,
           ff_dropout = self$ff_dropout,
           softmax_mod = self$softmax_mod,
-          is_softmax_mod = self$is_softmax_mod
+          is_softmax_mod = self$is_softmax_mod,
+          attention_type = self$attention_type
         )
       }
     } else if (self$attention == "intersample") {
@@ -158,7 +167,8 @@ tabtransformer <- torch::nn_module(
         dim_heads_intersample = self$dim_heads_intersample,
         attn_dropout = self$attn_dropout,
         ff_dropout = self$ff_dropout,
-        is_softmax_mod = self$is_softmax_mod
+        is_softmax_mod = self$is_softmax_mod,
+        attention_type = self$attention_type
       )
     } else if (self$attention == "mhsa") {
       self$transformer <- tabular_transformer_mhsa(
@@ -171,7 +181,8 @@ tabtransformer <- torch::nn_module(
         dim_heads_intersample = self$dim_heads_intersample,
         attn_dropout = self$attn_dropout,
         ff_dropout = self$ff_dropout,
-        softmax_mod = self$softmax_mod
+        softmax_mod = self$softmax_mod,
+        attention_type = self$attention_type
       )
     } else {
       stop("no appropriate attention type(s) selected")
@@ -197,7 +208,7 @@ tabtransformer <- torch::nn_module(
 
 
     ## Insert test of cont size
-    # x_cont <- self$norm(x_cont)
+    x_cont <- self$norm(x_cont)
     n <- x_cont$shape
 
     x_cont_enc <- torch::torch_empty(n[[1]], n[[2]], self$dim, device = self$device)
