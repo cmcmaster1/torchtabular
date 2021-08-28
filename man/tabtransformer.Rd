@@ -42,10 +42,8 @@ output to values >= 0 only). Default is NULL, which results a in \code{nn_identi
 use, either "both", "mhsa" or "intersample". Default: "both"}
 
 \item{attention_type}{(str) string value indicating either traditional softmax
-attention ("softmax") or signed attention ("signed"), which preserves the sign
-of the attention heads (negative or positive), so that attention heads can
-be interpreted as either being positively or negatively correlated with the
-outcome.}
+attention ("softmax"), sparasemax attention ("sparsemax"), signed attention
+("signed"), or fast attention ("fast").}
 
 \item{is_first}{(bool) designates whether intersample attention comes before MHSA}
 

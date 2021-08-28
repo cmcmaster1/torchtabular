@@ -42,6 +42,7 @@ library(tidymodels)
 library(tidyverse)
 library(torch)
 library(luz)
+library(madgrad)
 ```
 
 ### Check for GPU and assign device
@@ -100,11 +101,11 @@ Finally, we make a dataloader.
 
 ```{r}
 train_dl <- dataloader(train_dset,
-                       batch_size = 512,
+                       batch_size = 2048,
                        shuffle = TRUE)
 
 valid_dl <- dataloader(valid_dset,
-                       batch_size = 512,
+                       batch_size = 2048,
                        shuffle = FALSE)
 ```
 
@@ -113,14 +114,14 @@ valid_dl <- dataloader(valid_dset,
 We can now train our model using {luz}
 
 ```{r}
-n_epochs <- 25
+n_epochs <- 10
 ```
 
 ```{r}
 model_setup <- tabtransformer %>%
   setup(
     loss = nn_bce_with_logits_loss(),
-    optimizer = madgrad::optim_madgrad,
+    optimizer = optim_adamw,
     metrics = list(
       luz_metric_binary_auroc(from_logits = TRUE),
       luz_metric_binary_accuracy_with_logits()
@@ -130,16 +131,16 @@ model_setup <- tabtransformer %>%
               num_continuous = train_dset$num_continuous,
               dim_out = 1,
               attention = "both",
-              attention_type = "signed",
+              attention_type = "fast",
               is_first = TRUE,
-              dim = 32,
+              dim = 16,
               depth = 1,
-              heads_selfattn = 8,
-              heads_intersample = 8,
+              heads_selfattn = 16,
+              heads_intersample = 16,
               dim_heads_selfattn = 16,
               dim_heads_intersample = 64,
               attn_dropout = 0.1,
-              ff_dropout = 0.8,
+              ff_dropout = 0.5,
               embedding_dropout = 0.0,
               mlp_dropout = 0.0,
               mlp_hidden_mult = c(4, 2),
@@ -148,15 +149,22 @@ model_setup <- tabtransformer %>%
               device = device)
 ```
 
-```{r}
-find_lr <- lr_finder(model_setup, train_dl, start_lr = 1e-7, end_lr = 5e-3)
-```
 
 ```{r}
 fitted <- model_setup %>% 
-  set_opt_hparams(lr = 1e-5) %>% 
+  set_opt_hparams(lr = 1e-4) %>% 
   fit(train_dl,
       epochs = n_epochs,
       valid_data = valid_dl,
       verbose = TRUE)
+```
+
+```{r}
+metrics <- fitted$ctx$get_metrics_df()
+
+metrics %>% 
+  ggplot(aes(x = epoch, y = value, col = set)) + 
+  geom_line() + 
+  facet_wrap(vars(metric), scales = "free_y") +
+  theme_bw()
 ```
