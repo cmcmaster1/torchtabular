@@ -114,7 +114,7 @@ valid_dl <- dataloader(valid_dset,
 We can now train our model using {luz}
 
 ```{r}
-n_epochs <- 10
+n_epochs <- 15
 ```
 
 ```{r}
@@ -140,7 +140,7 @@ model_setup <- tabtransformer %>%
               dim_heads_selfattn = 16,
               dim_heads_intersample = 64,
               attn_dropout = 0.1,
-              ff_dropout = 0.5,
+              ff_dropout = 0.8,
               embedding_dropout = 0.0,
               mlp_dropout = 0.0,
               mlp_hidden_mult = c(4, 2),
@@ -156,7 +156,7 @@ fitted <- model_setup %>%
   fit(train_dl,
       epochs = n_epochs,
       valid_data = valid_dl,
-      verbose = TRUE)
+      verbose = FALSE)
 ```
 
 ```{r}
