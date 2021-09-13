@@ -102,11 +102,13 @@ Finally, we make a dataloader.
 ```{r}
 train_dl <- dataloader(train_dset,
                        batch_size = 2048,
-                       shuffle = TRUE)
+                       shuffle = TRUE,
+                       num_workers=4)
 
 valid_dl <- dataloader(valid_dset,
                        batch_size = 2048,
-                       shuffle = FALSE)
+                       shuffle = FALSE,
+                       num_workers=4)
 ```
 
 # Training
@@ -114,14 +116,14 @@ valid_dl <- dataloader(valid_dset,
 We can now train our model using {luz}
 
 ```{r}
-n_epochs <- 15
+n_epochs <- 50
 ```
 
 ```{r}
 model_setup <- tabtransformer %>%
   setup(
     loss = nn_bce_with_logits_loss(),
-    optimizer = optim_adamw,
+    optimizer = optim_madgrad,
     metrics = list(
       luz_metric_binary_auroc(from_logits = TRUE),
       luz_metric_binary_accuracy_with_logits()
@@ -130,13 +132,13 @@ model_setup <- tabtransformer %>%
   set_hparams(categories = train_dset$categories,
               num_continuous = train_dset$num_continuous,
               dim_out = 1,
-              attention = "both",
+              attention = "mhsa",
               attention_type = "fast",
               is_first = TRUE,
               dim = 16,
-              depth = 1,
-              heads_selfattn = 16,
-              heads_intersample = 16,
+              depth = 3,
+              heads_selfattn = 8,
+              heads_intersample = 4,
               dim_heads_selfattn = 16,
               dim_heads_intersample = 64,
               attn_dropout = 0.1,
@@ -156,15 +158,5 @@ fitted <- model_setup %>%
   fit(train_dl,
       epochs = n_epochs,
       valid_data = valid_dl,
-      verbose = FALSE)
-```
-
-```{r}
-metrics <- fitted$ctx$get_metrics_df()
-
-metrics %>% 
-  ggplot(aes(x = epoch, y = value, col = set)) + 
-  geom_line() + 
-  facet_wrap(vars(metric), scales = "free_y") +
-  theme_bw()
+      verbose = TRUE)
 ```

@@ -29,7 +29,9 @@
 #' @param mlp_dropout (float) dropout between MLP layers. Default: 0.1.
 #' @param mlp_hidden_mult (int vector) a numerical vector indicating the hidden dimensions of the final MLP
 #' @param softmax_mod (float) multiplier for the MHSA softmax function
-#' @param is_softmax_mod (floart) multiplier for the intersample attention softmax function
+#' @param is_softmax_mod (float) multiplier for the intersample attention softmax function
+#' @param skip (bool) Whether to include skip connections in attention mechanisms.
+#' Default: TRUE.
 #' @param device (str) 'cpu' or 'cuda'
 
 #'
@@ -70,6 +72,7 @@ tabtransformer <- torch::nn_module(
     mlp_hidden_mult = c(4, 2),
     softmax_mod = 1,
     is_softmax_mod = 1,
+    skip = TRUE,
     device = 'cuda'
   ) {
     if (!(attention %in% c("both", "mhsa", "intersample"))){

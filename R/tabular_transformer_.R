@@ -14,7 +14,8 @@ tabular_transformer_combined_isfirst <- torch::nn_module(
     ff_dropout,
     softmax_mod,
     is_softmax_mod,
-    attention_type)
+    attention_type,
+    skip)
   {
     self$layers <- torch::nn_module_list()
 
@@ -24,14 +25,14 @@ tabular_transformer_combined_isfirst <- torch::nn_module(
           list(
             attention(attention_type, dim, heads_selfattn, dim_heads_selfattn, softmax_mod),
             torch::nn_dropout(p = attn_dropout),
-            torch::nn_layer_norm(dim),
+            nn_layernorm_skip(dim, skip),
             ff(dim, dropout = ff_dropout),
-            torch::nn_layer_norm(dim),
+            nn_layernorm_skip(dim, skip),
             attention(attention_type, dim * cols, heads_intersample, dim_heads_intersample, is_softmax_mod),
             torch::nn_dropout(p = attn_dropout),
-            torch::nn_layer_norm(dim * cols),
+            nn_layernorm_skip(dim * cols, skip),
             ff(dim * cols, dropout = ff_dropout),
-            torch::nn_layer_norm(dim * cols)
+            nn_layernorm_skip(dim * cols, skip)
           )
         )
       )
@@ -48,17 +49,17 @@ tabular_transformer_combined_isfirst <- torch::nn_module(
       x <- x$reshape(c(1, b, n*d)) # change shape
       y <- self$layers[[i]][[6]](x) # attention
       y <- self$layers[[i]][[7]](y) # dropout
-      x <- self$layers[[i]][[8]](y)$add(x) # layernorm + skip connection
+      x <- self$layers[[i]][[8]](y, x) # layernorm + skip connection
       y <- self$layers[[i]][[9]](x) # feed forward
-      x <- self$layers[[i]][[10]](y)$add(x) # layernorm + skip connection
+      x <- self$layers[[i]][[10]](y, x) # layernorm + skip connection
 
 
       x <- x$reshape(c(b, n, d)) # revert shape
       y <- self$layers[[i]][[1]](x) # attention
       y <- self$layers[[i]][[2]](y) # dropout
-      x <- self$layers[[i]][[3]](y)$add(x) # layernorm + skip connection
+      x <- self$layers[[i]][[3]](y, x) # layernorm + skip connection
       y <- self$layers[[i]][[4]](x) # feed forward
-      x <- self$layers[[i]][[5]](y)$add(x) # layernorm + skip connection
+      x <- self$layers[[i]][[5]](y, x) # layernorm + skip connection
 
     }
 
@@ -80,9 +81,9 @@ tabular_transformer_combined_isfirst <- torch::nn_module(
       y <- out[[1]]
 
       y <- self$layers[[i]][[7]](y) # dropout
-      x <- self$layers[[i]][[8]](y)$add(x) # layernorm + skip connection
+      x <- self$layers[[i]][[8]](y, x) # layernorm + skip connection
       y <- self$layers[[i]][[9]](x) # feed forward
-      x <- self$layers[[i]][[10]](y)$add(x) # layernorm + skip connection
+      x <- self$layers[[i]][[10]](y, x) # layernorm + skip connection
       # revert shape
       x <- x$reshape(c(b, n, d))
 
@@ -92,9 +93,9 @@ tabular_transformer_combined_isfirst <- torch::nn_module(
       y <- out[[1]]
 
       y <- self$layers[[i]][[2]](y) # dropout
-      x <- self$layers[[i]][[3]](y)$add(x) # layernorm + skip connection
+      x <- self$layers[[i]][[3]](y, x) # layernorm + skip connection
       y <- self$layers[[i]][[4]](x) # feed forward
-      x <- self$layers[[i]][[5]](y)$add(x) # layernorm + skip connection
+      x <- self$layers[[i]][[5]](y, x) # layernorm + skip connection
 
       if (intersample){
         attn <- append(attn, is_attention_maps)
@@ -126,7 +127,8 @@ tabular_transformer_combined_islast <- torch::nn_module(
     ff_dropout,
     softmax_mod,
     is_softmax_mod,
-    attention_type)
+    attention_type,
+    skip)
   {
     self$layers <- torch::nn_module_list()
 
@@ -136,14 +138,14 @@ tabular_transformer_combined_islast <- torch::nn_module(
           list(
             attention(attention_type, dim, heads_selfattn, dim_heads_selfattn, softmax_mod),
             torch::nn_dropout(p = attn_dropout),
-            torch::nn_layer_norm(dim),
+            nn_layernorm_skip(dim, skip),
             ff(dim, dropout = ff_dropout),
-            torch::nn_layer_norm(dim),
+            nn_layernorm_skip(dim, skip),
             attention(attention_type, dim * cols, heads_intersample, dim_heads_intersample, is_softmax_mod),
             torch::nn_dropout(p = attn_dropout),
-            torch::nn_layer_norm(dim * cols),
+            nn_layernorm_skip(dim * cols, skip),
             ff(dim * cols, dropout = ff_dropout),
-            torch::nn_layer_norm(dim * cols)
+            nn_layernorm_skip(dim * cols, skip)
           )
         )
       )
@@ -154,9 +156,9 @@ tabular_transformer_combined_islast <- torch::nn_module(
     for (i in 1:length(self$layers)){
       y <- self$layers[[i]][[1]](x) # attention
       y <- self$layers[[i]][[2]](y) # dropout
-      x <- self$layers[[i]][[3]](y)$add(x) # layernorm + skip connection
+      x <- self$layers[[i]][[3]](y, x) # layernorm + skip connection
       y <- self$layers[[i]][[4]](x) # feed forward
-      x <- self$layers[[i]][[5]](y)$add(x) # layernorm + skip connection
+      x <- self$layers[[i]][[5]](y, x) # layernorm + skip connection
 
       # change the shape for intersample attention
       b <- x$shape[1]
@@ -166,9 +168,9 @@ tabular_transformer_combined_islast <- torch::nn_module(
       x <- x$reshape(c(1, b, n*d)) # change shape
       y <- self$layers[[i]][[6]](x) # attention
       y <- self$layers[[i]][[7]](y) # dropout
-      x <- self$layers[[i]][[8]](y)$add(x) # layernorm + skip connection
+      x <- self$layers[[i]][[8]](y, x) # layernorm + skip connection
       y <- self$layers[[i]][[9]](x) # feed forward
-      x <- self$layers[[i]][[10]](y)$add(x) # layernorm + skip connection
+      x <- self$layers[[i]][[10]](y, x) # layernorm + skip connection
       x <- x$reshape(c(b, n, d)) # revert shape
     }
     x
@@ -184,9 +186,9 @@ tabular_transformer_combined_islast <- torch::nn_module(
       y <- out[[1]]
 
       y <- self$layers[[i]][[2]](y) # dropout
-      x <- self$layers[[i]][[3]](y)$add(x) # layernorm + skip connection
+      x <- self$layers[[i]][[3]](y, x) # layernorm + skip connection
       y <- self$layers[[i]][[4]](x) # feed forward
-      x <- self$layers[[i]][[5]](y)$add(x) # layernorm + skip connection
+      x <- self$layers[[i]][[5]](y, x) # layernorm + skip connection
 
       # change the shape for intersample attention
       b <- x$shape[1]
@@ -199,9 +201,9 @@ tabular_transformer_combined_islast <- torch::nn_module(
       y <- out[[1]]
 
       y <- self$layers[[i]][[7]](y) # dropout
-      x <- self$layers[[i]][[8]](y)$add(x) # layernorm + skip connection
+      x <- self$layers[[i]][[8]](y, x) # layernorm + skip connection
       y <- self$layers[[i]][[9]](x) # feed forward
-      x <- self$layers[[i]][[10]](y)$add(x) # layernorm + skip connection
+      x <- self$layers[[i]][[10]](y, x) # layernorm + skip connection
       # revert shape
       x <- x$reshape(c(b, n, d))
 
@@ -233,7 +235,8 @@ tabular_transformer_intersample <- torch::nn_module(
     attn_dropout,
     ff_dropout,
     is_softmax_mod,
-    attention_type)
+    attention_type,
+    skip)
   {
     self$layers <- torch::nn_module_list()
     for (i in 1:depth){
@@ -242,9 +245,9 @@ tabular_transformer_intersample <- torch::nn_module(
           list(
             attention(attention_type, dim * cols, heads_intersample, dim_heads_intersample, is_softmax_mod),
             torch::nn_dropout(p = attn_dropout),
-            torch::nn_layer_norm(dim * cols),
+            nn_layernorm_skip(dim * cols, skip),
             ff(dim * cols, dropout = ff_dropout),
-            torch::nn_layer_norm(dim * cols)
+            nn_layernorm_skip(dim * cols, skip)
           )
         )
       )
@@ -260,9 +263,9 @@ tabular_transformer_intersample <- torch::nn_module(
       x <- x$reshape(c(1, b, n*d)) # change shape
       y <- self$layers[[i]][[1]](x) # attention
       y <- self$layers[[i]][[2]](y) # dropout
-      x <- self$layers[[i]][[3]](y)$add(x) # layernorm + skip connection
+      x <- self$layers[[i]][[3]](y, x) # layernorm + skip connection
       y <- self$layers[[i]][[4]](x) # feed forward
-      x <- self$layers[[i]][[5]](y)$add(x) # layernorm + skip connection
+      x <- self$layers[[i]][[5]](y, x) # layernorm + skip connection
       x <- x$reshape(c(b, n, d)) # revert shape
     }
     x
@@ -282,9 +285,9 @@ tabular_transformer_intersample <- torch::nn_module(
       y <- out[[1]]
 
       y <- self$layers[[i]][[2]](y) # dropout
-      x <- self$layers[[i]][[3]](y)$add(x) # layernorm + skip connection
+      x <- self$layers[[i]][[3]](y, x) # layernorm + skip connection
       y <- self$layers[[i]][[4]](x) # feed forward
-      x <- self$layers[[i]][[5]](y)$add(x) # layernorm + skip connection
+      x <- self$layers[[i]][[5]](y, x) # layernorm + skip connection
       x <- x$reshape(c(b, n, d))
 
       attn <- append(attn, attention_maps)
@@ -312,7 +315,8 @@ tabular_transformer_mhsa <- torch::nn_module(
     attn_dropout,
     ff_dropout,
     softmax_mod,
-    attention_type)
+    attention_type,
+    skip)
   {
     self$layers <- torch::nn_module_list()
     for (i in 1:depth){
@@ -321,9 +325,9 @@ tabular_transformer_mhsa <- torch::nn_module(
           list(
             attention(attention_type, dim, heads_selfattn, dim_heads_selfattn, softmax_mod),
             torch::nn_dropout(attn_dropout),
-            torch::nn_layer_norm(dim),
+            nn_layernorm_skip(dim, skip),
             ff(dim, dropout = ff_dropout),
-            torch::nn_layer_norm(dim)
+            nn_layernorm_skip(dim, skip)
           )
         )
       )
@@ -333,9 +337,9 @@ tabular_transformer_mhsa <- torch::nn_module(
     for (i in 1:length(self$layers)){
       y <- self$layers[[i]][[1]](x) # attention
       y <- self$layers[[i]][[2]](y) # dropout
-      x <- self$layers[[i]][[3]](y)$add(x) # layernorm + skip connection
+      x <- self$layers[[i]][[3]](y, x) # layernorm + skip connection
       y <- self$layers[[i]][[4]](x) # feed forward
-      x <- self$layers[[i]][[5]](y)$add(x) # layernorm + skip connection
+      x <- self$layers[[i]][[5]](y, x) # layernorm + skip connection
     }
     x
   },
@@ -349,9 +353,9 @@ tabular_transformer_mhsa <- torch::nn_module(
       y <- out[[1]]
 
       y <- self$layers[[i]][[2]](y) # dropout
-      x <- self$layers[[i]][[3]](y)$add(x) # layernorm + skip connection
+      x <- self$layers[[i]][[3]](y, x) # layernorm + skip connection
       y <- self$layers[[i]][[4]](x) # feed forward
-      x <- self$layers[[i]][[5]](y)$add(x) # layernorm + skip connection
+      x <- self$layers[[i]][[5]](y, x) # layernorm + skip connection
 
       attn <- append(attn, attention_maps)
     }

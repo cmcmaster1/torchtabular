@@ -63,3 +63,17 @@ tabular_mlp <- torch::nn_module(
   forward = function(x)
     self$mlp(x)
 )
+
+nn_layernorm_skip <- torch::nn_module(
+  "layernorm_skip",
+  initialize = function(dim, skip=TRUE){
+    self$ln <- torch::nn_layer_norm(dim)
+    self$skip <- skip
+  },
+  forward = function(x1, x2)
+    if(self$skip){
+      self$ln(x1)$add(x2)
+    } else{
+      self$ln(x1)
+    }
+)
