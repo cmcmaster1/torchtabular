@@ -101,12 +101,12 @@ Finally, we make a dataloader.
 
 ```{r}
 train_dl <- dataloader(train_dset,
-                       batch_size = 2048,
+                       batch_size = 512,
                        shuffle = TRUE,
                        num_workers=4)
 
 valid_dl <- dataloader(valid_dset,
-                       batch_size = 2048,
+                       batch_size = 512,
                        shuffle = FALSE,
                        num_workers=4)
 ```
@@ -116,7 +116,7 @@ valid_dl <- dataloader(valid_dset,
 We can now train our model using {luz}
 
 ```{r}
-n_epochs <- 50
+n_epochs <- 20
 ```
 
 ```{r}
@@ -132,13 +132,13 @@ model_setup <- tabtransformer %>%
   set_hparams(categories = train_dset$categories,
               num_continuous = train_dset$num_continuous,
               dim_out = 1,
-              attention = "mhsa",
-              attention_type = "fast",
+              attention = "both",
+              attention_type = "softmax",
               is_first = TRUE,
-              dim = 16,
-              depth = 3,
-              heads_selfattn = 8,
-              heads_intersample = 4,
+              dim = 32,
+              depth = 1,
+              heads_selfattn = 32,
+              heads_intersample = 32,
               dim_heads_selfattn = 16,
               dim_heads_intersample = 64,
               attn_dropout = 0.1,
@@ -148,6 +148,7 @@ model_setup <- tabtransformer %>%
               mlp_hidden_mult = c(4, 2),
               softmax_mod = 1.0,
               is_softmax_mod = 1.0,
+              skip = FALSE,
               device = device)
 ```
 

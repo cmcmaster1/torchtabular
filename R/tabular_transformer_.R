@@ -27,12 +27,12 @@ tabular_transformer_combined_isfirst <- torch::nn_module(
             torch::nn_dropout(p = attn_dropout),
             nn_layernorm_skip(dim, skip),
             ff(dim, dropout = ff_dropout),
-            nn_layernorm_skip(dim, skip),
+            nn_layernorm_skip(dim, skip = TRUE),
             attention(attention_type, dim * cols, heads_intersample, dim_heads_intersample, is_softmax_mod),
             torch::nn_dropout(p = attn_dropout),
             nn_layernorm_skip(dim * cols, skip),
             ff(dim * cols, dropout = ff_dropout),
-            nn_layernorm_skip(dim * cols, skip)
+            nn_layernorm_skip(dim * cols, skip = TRUE)
           )
         )
       )
@@ -140,12 +140,12 @@ tabular_transformer_combined_islast <- torch::nn_module(
             torch::nn_dropout(p = attn_dropout),
             nn_layernorm_skip(dim, skip),
             ff(dim, dropout = ff_dropout),
-            nn_layernorm_skip(dim, skip),
+            nn_layernorm_skip(dim, skip = TRUE),
             attention(attention_type, dim * cols, heads_intersample, dim_heads_intersample, is_softmax_mod),
             torch::nn_dropout(p = attn_dropout),
             nn_layernorm_skip(dim * cols, skip),
             ff(dim * cols, dropout = ff_dropout),
-            nn_layernorm_skip(dim * cols, skip)
+            nn_layernorm_skip(dim * cols, skip = TRUE)
           )
         )
       )
@@ -247,7 +247,7 @@ tabular_transformer_intersample <- torch::nn_module(
             torch::nn_dropout(p = attn_dropout),
             nn_layernorm_skip(dim * cols, skip),
             ff(dim * cols, dropout = ff_dropout),
-            nn_layernorm_skip(dim * cols, skip)
+            nn_layernorm_skip(dim * cols, skip = TRUE)
           )
         )
       )
@@ -327,7 +327,7 @@ tabular_transformer_mhsa <- torch::nn_module(
             torch::nn_dropout(attn_dropout),
             nn_layernorm_skip(dim, skip),
             ff(dim, dropout = ff_dropout),
-            nn_layernorm_skip(dim, skip)
+            nn_layernorm_skip(dim, skip = TRUE)
           )
         )
       )

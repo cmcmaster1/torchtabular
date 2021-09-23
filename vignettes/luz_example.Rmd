@@ -59,7 +59,7 @@ glimpse(income)
 We can now split the data into train and test sets.
 
 ```{r}
-split <- initial_split(income)
+split <- initial_split(income, prop = 0.7)
 train <- training(split)
 valid <- testing(split)
 ```
@@ -96,19 +96,17 @@ valid_dl <- dataloader(valid_dset,
 We can now train our model using luz for 10 epochs.
 
 ```{r}
-n_epochs <- 10
+n_epochs <- 20
 ```
 
-We will use a callback to save the best checkpoint.
+We will use a callback to reduce the learning rate by 90% after 10 epochs.
 
 ```{r}
-checkpoint <- luz_callback_model_checkpoint(
-  "checkpoints/",
-  monitor = "valid_loss",
-  save_best_only = TRUE,
-  mode = "min",
-  min_delta = 0
-)
+lambda <- function(epoch){
+  if (epoch > 10) 0.1 else 1
+}
+
+lr_decay <- luz::luz_callback_lr_scheduler(torch::lr_lambda, lr_lambda = lambda)
 ```
 
 Let's setup the model with our hyperparameters.
@@ -117,7 +115,7 @@ Let's setup the model with our hyperparameters.
 model_setup <- tabtransformer %>%
   setup(
     loss = nn_bce_with_logits_loss(),
-    optimizer = optim_madgrad,
+    optimizer = optim_adamw,
     metrics = list(
       luz_metric_binary_auroc(from_logits = TRUE)
     )
@@ -126,12 +124,12 @@ model_setup <- tabtransformer %>%
               num_continuous = train_dset$num_continuous,
               dim_out = 1,
               attention = "both",
-              attention_type = "signed",
+              attention_type = "softmax",
               is_first = TRUE,
               dim = 32,
               depth = 1,
-              heads_selfattn = 8,
-              heads_intersample = 8,
+              heads_selfattn = 32,
+              heads_intersample = 32,
               dim_heads_selfattn = 16,
               dim_heads_intersample = 64,
               attn_dropout = 0.1,
@@ -141,6 +139,7 @@ model_setup <- tabtransformer %>%
               mlp_hidden_mult = c(4, 2),
               softmax_mod = 1.0,
               is_softmax_mod = 1.0,
+              skip = FALSE,
               device = device)
 ```
 
@@ -154,8 +153,10 @@ fitted <- model_setup %>%
   fit(train_dl,
       epochs = n_epochs,
       valid_data = valid_dl,
-      verbose = TRUE)
+      verbose = TRUE,
+      callbacks = list(lr_decay))
 ```
+
 
 Plotting the metrics.
 

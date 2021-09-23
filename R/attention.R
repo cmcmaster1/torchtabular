@@ -171,9 +171,7 @@ sparsemax_attention <- torch::nn_module(
 
     self$qkv_proj <- torch::nn_linear(input_dim, 3*self$inner_dim)
     self$o_proj <- torch::nn_linear(self$inner_dim, input_dim)
-
-    self$softmax_mod <- softmax_mod
-    self$attention_type <- attention_type
+    self$sparsemax <- sparsemax(dim = -1)
 
   },
   forward = function(x, return_attention=FALSE) {
@@ -194,7 +192,7 @@ sparsemax_attention <- torch::nn_module(
     attn_logits <- torch::torch_matmul(q, k$transpose(-2, -1))
     attn_logits <- attn_logits / sqrt(d_k)
 
-    attention <- sparsemax(attn_logits, dim=-1)
+    attention <- self$sparsemax(attn_logits)
 
     values <- torch::torch_matmul(attention, v)
 

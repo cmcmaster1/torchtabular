@@ -25,6 +25,7 @@ tabtransformer(
   mlp_hidden_mult = c(4, 2),
   softmax_mod = 1,
   is_softmax_mod = 1,
+  skip = TRUE,
   device = "cuda"
 )
 }
@@ -71,7 +72,10 @@ attention ("softmax"), sparasemax attention ("sparsemax"), signed attention
 
 \item{softmax_mod}{(float) multiplier for the MHSA softmax function}
 
-\item{is_softmax_mod}{(floart) multiplier for the intersample attention softmax function}
+\item{is_softmax_mod}{(float) multiplier for the intersample attention softmax function}
+
+\item{skip}{(bool) Whether to include skip connections after attention layers.
+Default: TRUE.}
 
 \item{device}{(str) 'cpu' or 'cuda'}
 }
