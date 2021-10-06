@@ -25,6 +25,7 @@ tabtransformer(
   mlp_hidden_mult = c(4, 2),
   softmax_mod = 1,
   is_softmax_mod = 1,
+  skip = TRUE,
   device = "cuda"
 )
 }
@@ -42,10 +43,8 @@ output to values >= 0 only). Default is NULL, which results a in \code{nn_identi
 use, either "both", "mhsa" or "intersample". Default: "both"}
 
 \item{attention_type}{(str) string value indicating either traditional softmax
-attention ("softmax") or signed attention ("signed"), which preserves the sign
-of the attention heads (negative or positive), so that attention heads can
-be interpreted as either being positively or negatively correlated with the
-outcome.}
+attention ("softmax"), sparasemax attention ("sparsemax"), signed attention
+("signed"), or fast attention ("fast").}
 
 \item{is_first}{(bool) designates whether intersample attention comes before MHSA}
 
@@ -73,7 +72,10 @@ outcome.}
 
 \item{softmax_mod}{(float) multiplier for the MHSA softmax function}
 
-\item{is_softmax_mod}{(floart) multiplier for the intersample attention softmax function}
+\item{is_softmax_mod}{(float) multiplier for the intersample attention softmax function}
+
+\item{skip}{(bool) Whether to include skip connections after attention layers.
+Default: TRUE.}
 
 \item{device}{(str) 'cpu' or 'cuda'}
 }

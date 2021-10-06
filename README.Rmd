@@ -42,7 +42,15 @@ library(tidymodels)
 library(tidyverse)
 library(torch)
 library(luz)
+library(madgrad)
 ```
+
+### Set seeds
+```{r}
+torch_manual_seed(seed = 154)
+set.seed(154)
+```
+
 
 ### Check for GPU and assign device
 
@@ -100,23 +108,19 @@ Finally, we make a dataloader.
 
 ```{r}
 train_dl <- dataloader(train_dset,
-                       batch_size = 512,
+                       batch_size = 64,
                        shuffle = TRUE)
 
 valid_dl <- dataloader(valid_dset,
-                       batch_size = 512,
+                       batch_size = 1024,
                        shuffle = FALSE)
+
 ```
 
-# Training
-
-We can now train our model using {luz}
-
+Now we define our model:
 ```{r}
-n_epochs <- 25
-```
+n_epochs <- 5
 
-```{r}
 model_setup <- tabtransformer %>%
   setup(
     loss = nn_bce_with_logits_loss(),
@@ -134,8 +138,8 @@ model_setup <- tabtransformer %>%
               is_first = TRUE,
               dim = 32,
               depth = 1,
-              heads_selfattn = 8,
-              heads_intersample = 8,
+              heads_selfattn = 32,
+              heads_intersample = 32,
               dim_heads_selfattn = 16,
               dim_heads_intersample = 64,
               attn_dropout = 0.1,
@@ -145,18 +149,36 @@ model_setup <- tabtransformer %>%
               mlp_hidden_mult = c(4, 2),
               softmax_mod = 1.0,
               is_softmax_mod = 1.0,
-              device = device)
+              skip = FALSE,
+              device = device) %>% 
+  set_opt_hparams(lr = 2e-3) 
 ```
 
-```{r}
-find_lr <- lr_finder(model_setup, train_dl, start_lr = 1e-7, end_lr = 5e-3)
-```
-
+And train...
 ```{r}
 fitted <- model_setup %>% 
-  set_opt_hparams(lr = 1e-5) %>% 
   fit(train_dl,
       epochs = n_epochs,
       valid_data = valid_dl,
       verbose = TRUE)
 ```
+
+We test on a large batch to improve performance:
+```{r}
+full_dset <- tabular_dataset(recipe, bind_rows(valid, train))
+predict_bs <- 4000
+preds <- predict(fitted, 
+                 full_dset, 
+                 dataloader_options = list(batch_size = predict_bs))$squeeze(-1)
+
+preds <- as_array(preds)[1:nrow(valid)]
+truth <- as_factor(ifelse(valid$Churn == 1, "Yes", "No"))
+
+roc_auc_vec(truth = truth, estimate = preds, event_level = "second")
+```
+
+
+
+
+
+

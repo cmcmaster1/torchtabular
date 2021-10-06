@@ -14,10 +14,8 @@
 #' @param attention (str) string value indicating which type(s) of attention to
 #' use, either "both", "mhsa" or "intersample". Default: "both"
 #' @param attention_type (str) string value indicating either traditional softmax
-#' attention ("softmax") or signed attention ("signed"), which preserves the sign
-#' of the attention heads (negative or positive), so that attention heads can
-#' be interpreted as either being positively or negatively correlated with the
-#' outcome.
+#' attention ("softmax"), sparasemax attention ("sparsemax"), signed attention
+#' ("signed"), or fast attention ("fast").
 #' @param is_first (bool) designates whether intersample attention comes before MHSA
 #' @param dim (int) embedding dimension for categorical and continuous data
 #' @param depth (int) number of transformer layers
@@ -31,7 +29,9 @@
 #' @param mlp_dropout (float) dropout between MLP layers. Default: 0.1.
 #' @param mlp_hidden_mult (int vector) a numerical vector indicating the hidden dimensions of the final MLP
 #' @param softmax_mod (float) multiplier for the MHSA softmax function
-#' @param is_softmax_mod (floart) multiplier for the intersample attention softmax function
+#' @param is_softmax_mod (float) multiplier for the intersample attention softmax function
+#' @param skip (bool) Whether to include skip connections after attention layers.
+#' Default: TRUE.
 #' @param device (str) 'cpu' or 'cuda'
 
 #'
@@ -72,6 +72,7 @@ tabtransformer <- torch::nn_module(
     mlp_hidden_mult = c(4, 2),
     softmax_mod = 1,
     is_softmax_mod = 1,
+    skip = TRUE,
     device = 'cuda'
   ) {
     if (!(attention %in% c("both", "mhsa", "intersample"))){
@@ -95,6 +96,7 @@ tabtransformer <- torch::nn_module(
     self$is_first <- is_first
     self$softmax_mod <- softmax_mod
     self$is_softmax_mod <- is_softmax_mod
+    self$skip <- skip
     self$device <- device
 
 
@@ -138,7 +140,8 @@ tabtransformer <- torch::nn_module(
           ff_dropout = self$ff_dropout,
           softmax_mod = self$softmax_mod,
           is_softmax_mod = self$is_softmax_mod,
-          attention_type = self$attention_type
+          attention_type = self$attention_type,
+          skip = self$skip
         )
       } else {
         self$transformer <- tabular_transformer_combined_islast(
@@ -153,7 +156,8 @@ tabtransformer <- torch::nn_module(
           ff_dropout = self$ff_dropout,
           softmax_mod = self$softmax_mod,
           is_softmax_mod = self$is_softmax_mod,
-          attention_type = self$attention_type
+          attention_type = self$attention_type,
+          skip = self$skip
         )
       }
     } else if (self$attention == "intersample") {
@@ -168,7 +172,8 @@ tabtransformer <- torch::nn_module(
         attn_dropout = self$attn_dropout,
         ff_dropout = self$ff_dropout,
         is_softmax_mod = self$is_softmax_mod,
-        attention_type = self$attention_type
+        attention_type = self$attention_type,
+        skip = self$skip
       )
     } else if (self$attention == "mhsa") {
       self$transformer <- tabular_transformer_mhsa(
@@ -182,7 +187,8 @@ tabtransformer <- torch::nn_module(
         attn_dropout = self$attn_dropout,
         ff_dropout = self$ff_dropout,
         softmax_mod = self$softmax_mod,
-        attention_type = self$attention_type
+        attention_type = self$attention_type,
+        skip = self$skip
       )
     } else {
       stop("no appropriate attention type(s) selected")
