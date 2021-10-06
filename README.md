@@ -34,6 +34,13 @@ library(luz)
 library(madgrad)
 ```
 
+### Set seeds
+
+``` r
+torch_manual_seed(seed = 154)
+set.seed(154)
+```
+
 ### Check for GPU and assign device
 
 ``` r
@@ -139,29 +146,23 @@ Finally, we make a dataloader.
 
 ``` r
 train_dl <- dataloader(train_dset,
-                       batch_size = 512,
-                       shuffle = TRUE,
-                       num_workers=4)
+                       batch_size = 64,
+                       shuffle = TRUE)
 
 valid_dl <- dataloader(valid_dset,
-                       batch_size = 512,
-                       shuffle = FALSE,
-                       num_workers=4)
+                       batch_size = 1024,
+                       shuffle = FALSE)
 ```
 
-# Training
-
-We can now train our model using {luz}
+Now we define our model:
 
 ``` r
-n_epochs <- 20
-```
+n_epochs <- 5
 
-``` r
 model_setup <- tabtransformer %>%
   setup(
     loss = nn_bce_with_logits_loss(),
-    optimizer = optim_madgrad,
+    optimizer = madgrad::optim_madgrad,
     metrics = list(
       luz_metric_binary_auroc(from_logits = TRUE),
       luz_metric_binary_accuracy_with_logits()
@@ -171,7 +172,7 @@ model_setup <- tabtransformer %>%
               num_continuous = train_dset$num_continuous,
               dim_out = 1,
               attention = "both",
-              attention_type = "softmax",
+              attention_type = "signed",
               is_first = TRUE,
               dim = 32,
               depth = 1,
@@ -187,74 +188,47 @@ model_setup <- tabtransformer %>%
               softmax_mod = 1.0,
               is_softmax_mod = 1.0,
               skip = FALSE,
-              device = device)
+              device = device) %>% 
+  set_opt_hparams(lr = 2e-3) 
 ```
+
+And train…
 
 ``` r
 fitted <- model_setup %>% 
-  set_opt_hparams(lr = 1e-4) %>% 
   fit(train_dl,
       epochs = n_epochs,
       valid_data = valid_dl,
       verbose = TRUE)
-#> Epoch 1/20
-#> Train metrics: Loss: 0.588 - AUC: 0.4969 - Acc: 0.7266
-#> Valid metrics: Loss: 0.5965 - AUC: 0.7294 - Acc: 0.7342
-#> Epoch 2/20
-#> Train metrics: Loss: 0.5626 - AUC: 0.5967 - Acc: 0.7353
-#> Valid metrics: Loss: 0.4912 - AUC: 0.7984 - Acc: 0.7575
-#> Epoch 3/20
-#> Train metrics: Loss: 0.4968 - AUC: 0.7533 - Acc: 0.7397
-#> Valid metrics: Loss: 0.4972 - AUC: 0.8037 - Acc: 0.7269
-#> Epoch 4/20
-#> Train metrics: Loss: 0.465 - AUC: 0.7986 - Acc: 0.7734
-#> Valid metrics: Loss: 0.4778 - AUC: 0.809 - Acc: 0.7774
-#> Epoch 5/20
-#> Train metrics: Loss: 0.4534 - AUC: 0.8074 - Acc: 0.7785
-#> Valid metrics: Loss: 0.5443 - AUC: 0.8095 - Acc: 0.7609
-#> Epoch 6/20
-#> Train metrics: Loss: 0.452 - AUC: 0.8083 - Acc: 0.7772
-#> Valid metrics: Loss: 0.4498 - AUC: 0.8199 - Acc: 0.7626
-#> Epoch 7/20
-#> Train metrics: Loss: 0.4464 - AUC: 0.8155 - Acc: 0.7766
-#> Valid metrics: Loss: 0.4479 - AUC: 0.82 - Acc: 0.774
-#> Epoch 8/20
-#> Train metrics: Loss: 0.4409 - AUC: 0.8181 - Acc: 0.7813
-#> Valid metrics: Loss: 0.5036 - AUC: 0.8176 - Acc: 0.766
-#> Epoch 9/20
-#> Train metrics: Loss: 0.4468 - AUC: 0.8175 - Acc: 0.7836
-#> Valid metrics: Loss: 0.4427 - AUC: 0.8232 - Acc: 0.7734
-#> Epoch 10/20
-#> Train metrics: Loss: 0.4403 - AUC: 0.8211 - Acc: 0.7772
-#> Valid metrics: Loss: 0.448 - AUC: 0.8209 - Acc: 0.7751
-#> Epoch 11/20
-#> Train metrics: Loss: 0.4325 - AUC: 0.8288 - Acc: 0.7916
-#> Valid metrics: Loss: 0.4518 - AUC: 0.8234 - Acc: 0.7757
-#> Epoch 12/20
-#> Train metrics: Loss: 0.439 - AUC: 0.8228 - Acc: 0.7777
-#> Valid metrics: Loss: 0.4872 - AUC: 0.8128 - Acc: 0.7785
-#> Epoch 13/20
-#> Train metrics: Loss: 0.4545 - AUC: 0.8091 - Acc: 0.7758
-#> Valid metrics: Loss: 0.4407 - AUC: 0.8235 - Acc: 0.7768
-#> Epoch 14/20
-#> Train metrics: Loss: 0.4394 - AUC: 0.824 - Acc: 0.7861
-#> Valid metrics: Loss: 0.4429 - AUC: 0.8236 - Acc: 0.7763
-#> Epoch 15/20
-#> Train metrics: Loss: 0.4307 - AUC: 0.8263 - Acc: 0.7859
-#> Valid metrics: Loss: 0.4957 - AUC: 0.8213 - Acc: 0.7672
-#> Epoch 16/20
-#> Train metrics: Loss: 0.4344 - AUC: 0.8272 - Acc: 0.788
-#> Valid metrics: Loss: 0.4488 - AUC: 0.8233 - Acc: 0.7814
-#> Epoch 17/20
-#> Train metrics: Loss: 0.4334 - AUC: 0.8293 - Acc: 0.7906
-#> Valid metrics: Loss: 0.4746 - AUC: 0.8246 - Acc: 0.7677
-#> Epoch 18/20
-#> Train metrics: Loss: 0.4321 - AUC: 0.8319 - Acc: 0.7942
-#> Valid metrics: Loss: 0.4498 - AUC: 0.8245 - Acc: 0.778
-#> Epoch 19/20
-#> Train metrics: Loss: 0.4296 - AUC: 0.8319 - Acc: 0.7927
-#> Valid metrics: Loss: 0.4389 - AUC: 0.8275 - Acc: 0.7802
-#> Epoch 20/20
-#> Train metrics: Loss: 0.4303 - AUC: 0.8307 - Acc: 0.7927
-#> Valid metrics: Loss: 0.4826 - AUC: 0.8265 - Acc: 0.7655
+#> Epoch 1/5
+#> Train metrics: Loss: 0.539 - AUC: 0.7118 - Acc: 0.7225
+#> Valid metrics: Loss: 0.4966 - AUC: 0.7967 - Acc: 0.7439
+#> Epoch 2/5
+#> Train metrics: Loss: 0.4921 - AUC: 0.7622 - Acc: 0.7562
+#> Valid metrics: Loss: 0.5222 - AUC: 0.782 - Acc: 0.7808
+#> Epoch 3/5
+#> Train metrics: Loss: 0.4712 - AUC: 0.7908 - Acc: 0.7656
+#> Valid metrics: Loss: 0.4423 - AUC: 0.8144 - Acc: 0.7831
+#> Epoch 4/5
+#> Train metrics: Loss: 0.4764 - AUC: 0.7886 - Acc: 0.7692
+#> Valid metrics: Loss: 0.4644 - AUC: 0.8199 - Acc: 0.7814
+#> Epoch 5/5
+#> Train metrics: Loss: 0.4668 - AUC: 0.7992 - Acc: 0.7709
+#> Valid metrics: Loss: 0.4732 - AUC: 0.8162 - Acc: 0.7802
+```
+
+We test on a large batch to improve performance:
+
+``` r
+full_dset <- tabular_dataset(recipe, bind_rows(valid, train))
+predict_bs <- 4000
+preds <- predict(fitted, 
+                 full_dset, 
+                 dataloader_options = list(batch_size = predict_bs))$squeeze(-1)
+
+preds <- as_array(preds)[1:nrow(valid)]
+truth <- as_factor(ifelse(valid$Churn == 1, "Yes", "No"))
+
+roc_auc_vec(truth = truth, estimate = preds, event_level = "second")
+#> [1] 0.8226503
 ```

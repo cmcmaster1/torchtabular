@@ -174,7 +174,7 @@ preds <- predict(fitted,
 preds <- as_array(preds)[1:nrow(valid)]
 truth <- as_factor(ifelse(valid$Churn == 1, "Yes", "No"))
 
-roc_auc_vec(truth = truth, estimate = preds, event_level = "first")
+roc_auc_vec(truth = truth, estimate = preds, event_level = "second")
 ```
 
 
