@@ -122,7 +122,7 @@ tabtransformer <- torch::nn_module(
       lapply(1:self$num_continuous, function(x) continuous_embedding(100, self$dim))
     )
 
-    #self$dropout <- nn_dropout(self$embedding_dropout)
+    self$dropout <- nn_dropout(self$embedding_dropout)
 
     self$norm <- nn_layer_norm(num_continuous)
 
@@ -226,7 +226,7 @@ tabtransformer <- torch::nn_module(
     }
 
     x <- torch::torch_cat(c(x_cat, x_cont_enc), dim = 2)
-    #x <- self$dropout(x)
+    x <- self$dropout(x)
     x <- self$transformer(x)
     x <- torch_flatten(x, start_dim = 2)
     x <- self$mlp(x)
@@ -242,7 +242,7 @@ tabtransformer <- torch::nn_module(
     x_cat <- self$embeds_cat(x_cat)
 
     ## Insert test of cont size
-    # x_cont <- self$norm(x_cont)
+    x_cont <- self$norm(x_cont)
     n <- x_cont$shape
 
     x_cont_enc <- torch::torch_empty(n[[1]], n[[2]], self$dim, device = self$device)
