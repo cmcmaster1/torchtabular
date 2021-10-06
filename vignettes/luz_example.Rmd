@@ -29,6 +29,14 @@ library(luz)
 library(madgrad)
 ```
 
+We will set the seeds to make our results reproducible.
+
+```{r}
+torch_manual_seed(seed = 154)
+set.seed(154)
+```
+
+
 ## Check for GPU and assign device
 
 ```{r}
@@ -83,7 +91,7 @@ Finally, we make a dataloader.
 
 ```{r}
 train_dl <- dataloader(train_dset,
-                       batch_size = 512,
+                       batch_size = 64,
                        shuffle = TRUE)
 
 valid_dl <- dataloader(valid_dset,
@@ -96,26 +104,17 @@ valid_dl <- dataloader(valid_dset,
 We can now train our model using luz for 10 epochs.
 
 ```{r}
-n_epochs <- 20
-```
-
-We will use a callback to reduce the learning rate by 90% after 10 epochs.
-
-```{r}
-lambda <- function(epoch){
-  if (epoch > 10) 0.1 else 1
-}
-
-lr_decay <- luz::luz_callback_lr_scheduler(torch::lr_lambda, lr_lambda = lambda)
+n_epochs <- 5
 ```
 
 Let's setup the model with our hyperparameters.
+We will use MADGRAD as our optimizer - it works well and converges rapidly.
 
 ```{r}
 model_setup <- tabtransformer %>%
   setup(
     loss = nn_bce_with_logits_loss(),
-    optimizer = optim_adamw,
+    optimizer = madgrad::optim_madgrad,
     metrics = list(
       luz_metric_binary_auroc(from_logits = TRUE)
     )
@@ -124,7 +123,7 @@ model_setup <- tabtransformer %>%
               num_continuous = train_dset$num_continuous,
               dim_out = 1,
               attention = "both",
-              attention_type = "softmax",
+              attention_type = "signed",
               is_first = TRUE,
               dim = 32,
               depth = 1,
@@ -136,38 +135,50 @@ model_setup <- tabtransformer %>%
               ff_dropout = 0.8,
               embedding_dropout = 0.0,
               mlp_dropout = 0.0,
-              mlp_hidden_mult = c(4, 2),
+              mlp_hidden_mult = c(6, 4, 2),
               softmax_mod = 1.0,
               is_softmax_mod = 1.0,
               skip = FALSE,
-              device = device)
+              device = device) %>% 
+  set_opt_hparams(lr = 2e-3)
 ```
 
 Finally, we can fit the model. We have set verbose to FALSE so it doesn't fill our console. We can plot the loss and metrics after training to inspect how we did.
 
 
-
 ```{r}
 fitted <- model_setup %>% 
-  set_opt_hparams(lr = 1e-4) %>% 
   fit(train_dl,
       epochs = n_epochs,
       valid_data = valid_dl,
-      verbose = TRUE,
-      callbacks = list(lr_decay))
+      verbose = FALSE)
 ```
 
-
-Plotting the metrics.
+Plotting the training performance progress:
 
 ```{r}
-metrics <- fitted$ctx$get_metrics_df()
+metrics <- get_metrics(fitted)
 
 metrics %>% 
   ggplot(aes(x = epoch, y = value, col = set)) + 
   geom_line() + 
   facet_wrap(vars(metric), scales = "free_y") +
   theme_bw()
+```
+# Improve Performance with Large Batch Testing
+
+We can improve the quality of our prediction by using large batches. The inter-sample attention layer can pay attention to all the other data points in a batch to make each prediction.
+```{r}
+pred_dl <- dataloader(valid_dset,
+                       batch_size = 5000,
+                       shuffle = FALSE)
+preds <- predict(fitted, 
+                 valid_dl)$squeeze(-1)
+
+preds <- as_array(preds)
+truth <- as_factor(ifelse(valid$income == 1, "High", "Low"))
+
+roc_auc_vec(truth = truth, estimate = preds, event_level = "second")
 ```
 
 # Investigate the Model
@@ -193,7 +204,7 @@ heatmap(heads)
 The intersample attention heads can be pulled using the `intersample_attention_heads` function.
 
 ```{r}
-is_heads <- intersample_attention_heads(fitted, valid_dset, n = 2000, cut = 0.00)
+is_heads <- intersample_attention_heads(fitted, valid_dset, n = 2000)
 ```
 
 These attention heads lend themselves to clustering. We will start by reducing the number of dimensions using UMAP.

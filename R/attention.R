@@ -18,12 +18,16 @@ softmax_attention <- torch::nn_module(
     embed_dim <- x$shape[3]
 
     qkv <- self$qkv_proj(x)
-    qkv <- qkv$reshape(c(batch_size, seq_length, self$num_heads, 3*self$dim_head))
-    qkv <- qkv$permute(c(1, 3, 2, 4))
-    q_k_v <- qkv$chunk(3, dim=-1)
-    q <- q_k_v[[1]]
-    k <- q_k_v[[2]]
-    v <- q_k_v[[3]]
+    qkv <- qkv$chunk(3, dim=-1)
+    qkv <- lapply(qkv,
+                  function(x) {
+                    x$reshape(c(batch_size, seq_length, self$num_heads, self$dim_head))$permute(c(1, 3, 2, 4))
+                  }
+    )
+
+    q <- qkv[[1]]
+    k <- qkv[[2]]
+    v <- qkv[[3]]
 
     qs <- length(q$shape)
     d_k <- q$shape[qs]
@@ -56,7 +60,7 @@ signed_attention <- torch::nn_module(
 
     self$qkv_proj <- torch::nn_linear(input_dim, 3*self$inner_dim)
     self$o_proj <- torch::nn_linear(self$inner_dim, input_dim)
-    self$k_relu <- torch::nn_relu()
+    self$v_relu <- torch::nn_relu()
 
     self$softmax_mod <- softmax_mod
   },
@@ -66,24 +70,25 @@ signed_attention <- torch::nn_module(
     embed_dim <- x$shape[3]
 
     qkv <- self$qkv_proj(x)
-    qkv <- qkv$reshape(c(batch_size, seq_length, self$num_heads, 3*self$dim_head))
-    qkv <- qkv$permute(c(1, 3, 2, 4))
-    q_k_v <- qkv$chunk(3, dim=-1)
-    q <- q_k_v[[1]]
-    k <- q_k_v[[2]]
-    v <- q_k_v[[3]]
-    v <- self$k_relu(v)
+    qkv <- qkv$chunk(3, dim=-1)
+    qkv <- lapply(qkv,
+                  function(x) {
+                    x$reshape(c(batch_size, seq_length, self$num_heads, self$dim_head))$permute(c(1, 3, 2, 4))
+                  }
+    )
+
+    q <- qkv[[1]]
+    k <- qkv[[2]]
+    v <- qkv[[3]]
+
+    v <- self$v_relu(v)
 
     qs <- length(q$shape)
     d_k <- q$shape[qs]
     attn_logits <- torch::torch_matmul(q, k$transpose(-2, -1))
     attn_logits <- attn_logits / sqrt(d_k)
 
-    attention <- torch::torch_sign(attn_logits) *
-      (torch::nnf_softmax(-self$softmax_mod * attn_logits, -1) +
-         torch::nnf_softmax(self$softmax_mod * attn_logits, -1))/2
-
-    # attention <- torch::nnf_normalize(attn_logits, p = 1, dim = -1)
+    attention <- torch::nnf_normalize(attn_logits, p = 1, dim = -1)
 
     values <- torch::torch_matmul(attention, v)
 

@@ -37,9 +37,6 @@ attention_heads <- function(model, dataset, n = 100, device = 'cpu'){
 #' @param dataset dataset to pass through the model to generate intersample
 #' attention heads.
 #' @param n number of rows to use from the dataset. Default is 100.
-#' @param cut quantile below which attention is rounded down to 0.
-#' This is only used if the model uses softmax attention. Default is
-#' 0.99 (i.e. only retain the top 1\% of attention heads).
 #' @param device whether to run this on 'cpu' or 'cuda'
 #'
 #' @return average intersample attention heads as a matrix
@@ -49,7 +46,6 @@ attention_heads <- function(model, dataset, n = 100, device = 'cpu'){
 intersample_attention_heads <- function(model,
                                         dataset,
                                         n = 100,
-                                        cut = 0.99,
                                         device = 'cpu'){
 
 
@@ -63,11 +59,6 @@ intersample_attention_heads <- function(model,
   rm(temp_model)
   gc(verbose = FALSE, full = TRUE)
   attention_matrix <- torch::torch_cat(full_output[[2]])$mean(c(1,2))
-
-  if (model$model$attention_type == "softmax"){
-    quant <- torch::torch_quantile(attention_matrix, q = torch_scalar_tensor(cut, device = device))
-    attention_matrix[attention_matrix < quant] <- 0
-  }
 
   as.matrix(attention_matrix$detach()$cpu())
 }

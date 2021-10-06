@@ -45,6 +45,13 @@ library(luz)
 library(madgrad)
 ```
 
+### Set seeds
+```{r}
+torch_manual_seed(seed = 154)
+set.seed(154)
+```
+
+
 ### Check for GPU and assign device
 
 ```{r}
@@ -101,29 +108,23 @@ Finally, we make a dataloader.
 
 ```{r}
 train_dl <- dataloader(train_dset,
-                       batch_size = 512,
-                       shuffle = TRUE,
-                       num_workers=4)
+                       batch_size = 64,
+                       shuffle = TRUE)
 
 valid_dl <- dataloader(valid_dset,
-                       batch_size = 512,
-                       shuffle = FALSE,
-                       num_workers=4)
+                       batch_size = 1024,
+                       shuffle = FALSE)
+
 ```
 
-# Training
-
-We can now train our model using {luz}
-
+Now we define our model:
 ```{r}
-n_epochs <- 20
-```
+n_epochs <- 5
 
-```{r}
 model_setup <- tabtransformer %>%
   setup(
     loss = nn_bce_with_logits_loss(),
-    optimizer = optim_madgrad,
+    optimizer = madgrad::optim_madgrad,
     metrics = list(
       luz_metric_binary_auroc(from_logits = TRUE),
       luz_metric_binary_accuracy_with_logits()
@@ -133,7 +134,7 @@ model_setup <- tabtransformer %>%
               num_continuous = train_dset$num_continuous,
               dim_out = 1,
               attention = "both",
-              attention_type = "softmax",
+              attention_type = "signed",
               is_first = TRUE,
               dim = 32,
               depth = 1,
@@ -149,15 +150,35 @@ model_setup <- tabtransformer %>%
               softmax_mod = 1.0,
               is_softmax_mod = 1.0,
               skip = FALSE,
-              device = device)
+              device = device) %>% 
+  set_opt_hparams(lr = 2e-3) 
 ```
 
-
+And train...
 ```{r}
 fitted <- model_setup %>% 
-  set_opt_hparams(lr = 1e-4) %>% 
   fit(train_dl,
       epochs = n_epochs,
       valid_data = valid_dl,
       verbose = TRUE)
 ```
+
+We test on a large batch to improve performance:
+```{r}
+full_dset <- tabular_dataset(recipe, bind_rows(valid, train))
+predict_bs <- 4000
+preds <- predict(fitted, 
+                 full_dset, 
+                 dataloader_options = list(batch_size = predict_bs))$squeeze(-1)
+
+preds <- as_array(preds)[1:nrow(valid)]
+truth <- as_factor(ifelse(valid$Churn == 1, "Yes", "No"))
+
+roc_auc_vec(truth = truth, estimate = preds, event_level = "first")
+```
+
+
+
+
+
+

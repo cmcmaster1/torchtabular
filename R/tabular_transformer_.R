@@ -23,12 +23,12 @@ tabular_transformer_combined_isfirst <- torch::nn_module(
       self$layers$append(
         torch::nn_module_list(
           list(
-            attention(attention_type, dim, heads_selfattn, dim_heads_selfattn, softmax_mod),
+            attention(attention_type, dim, dim_heads_selfattn, heads_selfattn, softmax_mod),
             torch::nn_dropout(p = attn_dropout),
             nn_layernorm_skip(dim, skip),
             ff(dim, dropout = ff_dropout),
             nn_layernorm_skip(dim, skip = TRUE),
-            attention(attention_type, dim * cols, heads_intersample, dim_heads_intersample, is_softmax_mod),
+            attention(attention_type, dim * cols, dim_heads_intersample, heads_intersample, is_softmax_mod),
             torch::nn_dropout(p = attn_dropout),
             nn_layernorm_skip(dim * cols, skip),
             ff(dim * cols, dropout = ff_dropout),
@@ -67,7 +67,7 @@ tabular_transformer_combined_isfirst <- torch::nn_module(
   },
 
   get_attention = function(x, intersample = FALSE){
-    attn <- c()
+    attn <- list()
     for (i in 1:length(self$layers)){
 
       # change the shape for intersample attention
@@ -136,12 +136,12 @@ tabular_transformer_combined_islast <- torch::nn_module(
       self$layers$append(
         torch::nn_module_list(
           list(
-            attention(attention_type, dim, heads_selfattn, dim_heads_selfattn, softmax_mod),
+            attention(attention_type, dim, dim_heads_selfattn, heads_selfattn, softmax_mod),
             torch::nn_dropout(p = attn_dropout),
             nn_layernorm_skip(dim, skip),
             ff(dim, dropout = ff_dropout),
             nn_layernorm_skip(dim, skip = TRUE),
-            attention(attention_type, dim * cols, heads_intersample, dim_heads_intersample, is_softmax_mod),
+            attention(attention_type, dim * cols, dim_heads_intersample, heads_intersample, is_softmax_mod),
             torch::nn_dropout(p = attn_dropout),
             nn_layernorm_skip(dim * cols, skip),
             ff(dim * cols, dropout = ff_dropout),
@@ -177,7 +177,7 @@ tabular_transformer_combined_islast <- torch::nn_module(
   },
 
   get_attention = function(x, intersample = FALSE){
-    attn <- c()
+    attn <- list()
     for (i in 1:length(self$layers)){
 
       out <- self$layers[[i]][[1]](x, return_attention = TRUE)
@@ -243,7 +243,7 @@ tabular_transformer_intersample <- torch::nn_module(
       self$layers$append(
         torch::nn_module_list(
           list(
-            attention(attention_type, dim * cols, heads_intersample, dim_heads_intersample, is_softmax_mod),
+            attention(attention_type, dim * cols, dim_heads_intersample, heads_intersample, is_softmax_mod),
             torch::nn_dropout(p = attn_dropout),
             nn_layernorm_skip(dim * cols, skip),
             ff(dim * cols, dropout = ff_dropout),
@@ -272,7 +272,7 @@ tabular_transformer_intersample <- torch::nn_module(
   },
 
   get_attention = function(x, intersample = FALSE){
-    attn <- c()
+    attn <- list()
     for (i in 1:length(self$layers)){
       # change the shape for intersample attention
       b <- x$shape[1]
@@ -323,7 +323,7 @@ tabular_transformer_mhsa <- torch::nn_module(
       self$layers$append(
         torch::nn_module_list(
           list(
-            attention(attention_type, dim, heads_selfattn, dim_heads_selfattn, softmax_mod),
+            attention(attention_type, dim, dim_heads_selfattn, heads_selfattn, softmax_mod),
             torch::nn_dropout(attn_dropout),
             nn_layernorm_skip(dim, skip),
             ff(dim, dropout = ff_dropout),
@@ -345,7 +345,7 @@ tabular_transformer_mhsa <- torch::nn_module(
   },
 
   get_attention = function(x, intersample = FALSE){
-    attn <- c()
+    attn <- list()
     for (i in 1:length(self$layers)){
       out <- self$layers[[i]][[1]](x, return_attention = TRUE)
 
