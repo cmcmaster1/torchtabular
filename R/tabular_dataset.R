@@ -38,6 +38,12 @@ tabular_dataset.data.frame <- torch::dataset(
     self$cat_vars <- x[, which(names(x) %in% cat_vars)]
     self$cont_vars <- x[, which(names(x) %in% cont_vars)]
     self$response <- x[[response]]
+
+    self$categories <- sapply(self$cat_vars, function(x) length(levels(x)))
+
+    if (length(self$categories) == 0) self$categories <- NULL
+
+    self$num_continuous <- length(self$cont_vars)
   },
 
   .getitem = function(index) {
@@ -85,6 +91,56 @@ tabular_dataset.recipe <- torch::dataset(
     processed <- hardhat::mold(x, data)
     self$predictors <- as.matrix(processed$predictors)
     self$outcomes <- as.numeric(as.matrix(processed$outcomes))
+
+    self$cat_vars <- self$predictors[,cat_predictors]
+    self$cont_vars <- self$predictors[,cont_predictors]
+    self$response <- self$outcomes
+  },
+
+  .getitem = function(index) {
+    response <- torch::torch_tensor(self$response[index])
+    x_cat <- torch::torch_tensor(self$cat_vars[index,], dtype = torch::torch_long())
+    x_cont <- torch::torch_tensor(self$cont_vars[index,])
+
+    list(x = list(x_cat = x_cat, x_cont = x_cont), y = response)
+  },
+
+  .length = function() {
+    length(self$response)
+  }
+)
+
+
+
+
+
+
+
+tabular_dataset.recipe <- torch::dataset(
+  "tabular_dataset",
+  initialize = function(x, data) {
+    predictors <- x$var_info %>%
+      dplyr::filter(role == "predictor")
+
+    cat_predictors <- predictors %>%
+      dplyr::filter(type == "nominal") %>%
+      dplyr::pull(variable)
+
+    cont_predictors <- predictors %>%
+      dplyr::filter(type == "numeric") %>%
+      dplyr::pull(variable)
+
+    self$categories <- sapply(x$template[cat_predictors], function(x) length(levels(x)))
+
+    if (length(self$categories) == 0) self$categories <- NULL
+
+    self$num_continuous <- length(cont_predictors)
+
+    processed <- hardhat::mold(x, data)
+    self$predictors <- as.matrix(processed$predictors)
+    self$outcomes <- as.numeric(as.matrix(processed$outcomes))
+
+
 
     self$cat_vars <- self$predictors[,cat_predictors]
     self$cont_vars <- self$predictors[,cont_predictors]
